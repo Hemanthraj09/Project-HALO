@@ -1,19 +1,15 @@
-# Secrets: the Firebase Admin key grants full read/write to the database
+# Secrets: the Firebase Admin key gives full access to the database
 **/serviceAccountKey.json
 **/.env.local
 **/.env.*.local
 
 # Dependencies and build output
-**/node_modules/
-**/build/
+dashboard/node_modules/
+dashboard/build/
 **/__pycache__/
 *.pyc
+firmware/**/build/
 
-# OS files
+# OS and editor files
 .DS_Store
-
-# Pre-Session-4 copies of the edited files, kept for reference only
-_backup_before_session4_2026-11-22/
-
-# Local export of old Firebase readings (health data), never commit
-_firebase_backup_2026-11-22/
+.vscode/
