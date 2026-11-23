@@ -111,6 +111,11 @@ Behaviour worth knowing:
   - Sends every 1 s at P0 (MAYDAY) and every 2 s otherwise (`TX_P0_MS`, `TX_P1_MS`, `TX_P2_MS`), and immediately when the priority gets worse.
   - Checks the LoRa radio every 2 s and re-initialises it on its own (1 → 30 s backoff, no reboot).
   - Ignores CO/AQI for the first 3 minutes after power-on while the MQ heaters warm up.
+  - GPS:
+    - Accepts fixes with HDOP ≤ 3.
+    - If no fix has been accepted for 5 s, accepts weaker ones up to HDOP 6, so the position stays current near buildings. The dashboard's accuracy ring grows with HDOP.
+    - Keeps the last fix when the signal is lost and reports its age.
+    - While the receiver's own speed says the wearer is standing still, new fixes are averaged in (weighted by HDOP) and single stray fixes are ignored. This cut the stationary wander from about 11 m to 2 m RMS in tests. Movement shows up within one fix.
 - **Gateway:**
   - Has the same radio health check, plus a re-init after 60 s without packets.
   - Status lines starting with `#` are diagnostics.
@@ -168,6 +173,8 @@ npm start          # http://127.0.0.1:3000
   - training load and HR zones
   - strain, heat and CO exposure
   - activity, SpO₂, HR recovery and session comparison
+- **Light and dark mode:** the sun/moon button at the right end of the LIVE / ANALYTICS bar. Until you press it, the dashboard follows the OS setting; after that, the choice is saved in the browser. In dark mode the map tiles are darkened, and markers, hazard zones and the trail keep the same colour coding.
+- **Map trail:** GPS fixes that stay within the fix's accuracy (8–25 m) are averaged into one trail point, and a single stray fix is ignored, so a responder standing still draws no zig-zag.
 
 ## Data in Firebase
 

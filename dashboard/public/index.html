@@ -7,6 +7,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" />
+    <script>
+      // Light or dark before the bundle loads, so a dark page does not flash white. Same rule and
+      // key as src/lib/themeMode.js: the stored choice, else the OS setting.
+      (function () {
+        var mode = null;
+        try {
+          var saved = window.localStorage.getItem('halo.theme.v1');
+          if (saved === 'light' || saved === 'dark') mode = saved;
+        } catch (e) {}
+        if (!mode) mode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', mode);
+        document.documentElement.style.colorScheme = mode;
+      })();
+    </script>
+    <style>
+      /* dark bg0 from src/theme.js, until the app's stylesheet takes over */
+      html[data-theme='dark'] { background: #0A101D; }
+    </style>
   </head>
   <body>
     <noscript>The HALO dashboard needs JavaScript.</noscript>

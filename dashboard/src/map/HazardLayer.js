@@ -6,11 +6,12 @@
 
 import React, { useMemo } from 'react';
 import { Circle, Marker, Popup, Tooltip } from 'react-leaflet';
+import { useTheme } from '../lib/themeMode';
 import { SEVERITY, T } from '../theme';
 import { fmtHazardValue, HAZARD_META, hazardLabel, hazardRadius, isHazardLive } from '../lib/hazards';
 import { fmtDuration, fmtStamp } from '../lib/time';
 import { HAZARD_ICONS, sidePinIcon } from './mapIcons';
-import { hazardStyle, layoutPins, POPUP_PANE, TOOLTIP_PANE } from './mapData';
+import { hazardStyle, hazardTextColor, layoutPins, POPUP_PANE, TOOLTIP_PANE } from './mapData';
 
 const stamp = (ms) => (ms === null ? '--' : fmtStamp(ms));
 
@@ -68,6 +69,7 @@ export function HazardInfo({ h, now }) {
 }
 
 const HazardZone = React.memo(function HazardZone({ h, now }) {
+  useTheme();
   const live = isHazardLive(h, now);
   const style = hazardStyle(h, live);
   const center = useMemo(() => [h.lat, h.lon], [h.lat, h.lon]);
@@ -80,7 +82,7 @@ const HazardZone = React.memo(function HazardZone({ h, now }) {
       pathOptions={style}
     >
       <Tooltip pane={TOOLTIP_PANE} direction="top" offset={[0, -6]}>
-        <span style={{ color: style.color, fontWeight: 700 }}>{shortText(h)}</span>
+        <span style={{ color: hazardTextColor(h), fontWeight: 700 }}>{shortText(h)}</span>
         {h.active ? null : <span> (cleared)</span>}
       </Tooltip>
       <Popup pane={POPUP_PANE}>

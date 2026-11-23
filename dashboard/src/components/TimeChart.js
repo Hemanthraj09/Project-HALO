@@ -1,14 +1,21 @@
 // Time-axis line chart (recharts). x = reading time from ts_ms, so pauses in the data show as
-// gaps. Memoised: it re-renders only when its data or props change, not on the 1 s tick.
+// gaps. Memoised: it re-renders only when its data or props change or the theme switches, not on
+// the 1 s tick.
 
 import React from 'react';
 import { CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { FS, T } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { FS, T, themed } from '../theme';
 import { isNum } from '../lib/num';
 import { fmtClock, fmtHM } from '../lib/time';
 import { Card } from './ui';
 
-const TICK = { fontSize: FS.xs, fill: T.textDim };
+// The hover cursor and the active dot's ring use the theme too (recharts defaults are #ccc / #fff).
+const chrome = themed(() => ({
+  tick: { fontSize: FS.xs, fill: T.textDim },
+  cursor: { stroke: T.borderStrong, strokeWidth: 1 },
+  activeDot: { r: 3, stroke: T.bg2 },
+}));
 const MARGIN_ONE_AXIS = { top: 8, right: 12, bottom: 0, left: 0 };
 const MARGIN_TWO_AXES = { top: 8, right: 0, bottom: 0, left: 0 };
 
@@ -34,8 +41,11 @@ function ChartTip({ active, payload, label, series }) {
 }
 
 // series: [{ key, name, color, unit, digits, axis: 'left'|'right', dashed }]
-// refLines: [{ y, label, color, overflow }]   bands: [{ y1, y2, fill, opacity }]
+// refLines: [{ y, label, color, overflow, above }]   bands: [{ y1, y2, fill, opacity }]
+// A reference label sits just below its line, or just above it with `above`; its halo in the card
+// colour keeps it legible where a dashed line or grid line runs through it.
 function TimeChart({ data, series, height = 120, yDomain, yDomainRight, refLines, bands }) {
+  useTheme();
   const hasValues = data.some((p) => series.some((s) => isNum(p[s.key])));
   if (data.length < 2 || !hasValues) {
     return (
@@ -47,6 +57,7 @@ function TimeChart({ data, series, height = 120, yDomain, yDomainRight, refLines
   const spanMs = data[data.length - 1].t - data[0].t;
   const tickFormatter = spanMs < 10 * 60 * 1000 ? fmtClock : fmtHM;
   const hasRight = series.some((s) => s.axis === 'right');
+  const c = chrome();
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={data} margin={hasRight ? MARGIN_TWO_AXES : MARGIN_ONE_AXIS}>
@@ -57,14 +68,14 @@ function TimeChart({ data, series, height = 120, yDomain, yDomainRight, refLines
           scale="time"
           domain={['dataMin', 'dataMax']}
           tickFormatter={tickFormatter}
-          tick={TICK}
+          tick={c.tick}
           stroke={T.borderMid}
           tickLine={false}
           minTickGap={56}
         />
-        <YAxis yAxisId="left" domain={yDomain || ['auto', 'auto']} tick={TICK} stroke={T.borderMid} tickLine={false} width={40} />
+        <YAxis yAxisId="left" domain={yDomain || ['auto', 'auto']} tick={c.tick} stroke={T.borderMid} tickLine={false} width={40} />
         {hasRight ? (
-          <YAxis yAxisId="right" orientation="right" domain={yDomainRight || ['auto', 'auto']} tick={TICK} stroke={T.borderMid} tickLine={false} width={36} />
+          <YAxis yAxisId="right" orientation="right" domain={yDomainRight || ['auto', 'auto']} tick={c.tick} stroke={T.borderMid} tickLine={false} width={36} />
         ) : null}
         {(bands || []).map((b) => (
           <ReferenceArea key={`band-${b.y1}-${b.y2}`} yAxisId="left" y1={b.y1} y2={b.y2} fill={b.fill} fillOpacity={b.opacity || 0.1} stroke="none" ifOverflow="hidden" />
@@ -77,10 +88,14 @@ function TimeChart({ data, series, height = 120, yDomain, yDomainRight, refLines
             stroke={l.color}
             strokeDasharray="4 3"
             ifOverflow={l.overflow || 'extendDomain'}
-            label={l.label ? { value: l.label, position: 'insideTopLeft', fill: l.color, fontSize: FS.xs } : undefined}
+            label={
+              l.label
+                ? { value: l.label, position: l.above ? 'insideBottomLeft' : 'insideTopLeft', fill: l.color, fontSize: FS.xs, stroke: T.bg2, strokeWidth: 3, paintOrder: 'stroke' }
+                : undefined
+            }
           />
         ))}
-        <Tooltip content={<ChartTip series={series} />} isAnimationActive={false} />
+        <Tooltip content={<ChartTip series={series} />} cursor={c.cursor} isAnimationActive={false} />
         {series.map((s) => (
           <Line
             key={s.key}
@@ -92,7 +107,7 @@ function TimeChart({ data, series, height = 120, yDomain, yDomainRight, refLines
             strokeWidth={1.75}
             strokeDasharray={s.dashed ? '5 3' : undefined}
             dot={false}
-            activeDot={{ r: 3 }}
+            activeDot={c.activeDot}
             isAnimationActive={false}
             connectNulls={false}
           />

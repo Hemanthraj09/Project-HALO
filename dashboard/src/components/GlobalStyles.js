@@ -1,12 +1,36 @@
 // Global stylesheet, generated from the theme tokens so there is one source for every colour,
-// font and size. Light theme only. Rendered once by App as a <style> element; it contains only
-// constants from theme.js, never data.
+// font and size. Built once per theme (light and dark) and re-rendered on a theme switch; it
+// contains only constants from theme.js, never data.
 
-import { FONT, FS, RADIUS, SHADOW, T } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { alpha, FONT, FS, MARKER, RADIUS, SHADOW, T, themed, themeMode } from '../theme';
 
 const px = (n) => `${n}px`;
 
-const CSS = `
+// Dark theme only: the OSM tiles are inverted and dimmed (the tile pane only, so markers, zones,
+// the trail and labels keep their colours), and Leaflet's white controls, popups and tooltip
+// arrows move to the dark surfaces. The light theme keeps Leaflet's own styling.
+const darkMapCss = () => `
+.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+.leaflet-bar { box-shadow: ${SHADOW.pop}; }
+.leaflet-touch .leaflet-bar { border-color: ${T.borderMid}; }
+.leaflet-bar a { background-color: ${T.bg1}; color: ${T.textStrong}; border-bottom-color: ${T.border}; }
+.leaflet-bar a:hover, .leaflet-bar a:focus { background-color: ${T.bg3}; }
+.leaflet-bar a.leaflet-disabled { background-color: ${T.bg1}; color: ${T.borderStrong}; }
+.leaflet-container .leaflet-control-attribution { background: ${alpha(T.bg1, 0.85)}; color: ${T.textMuted}; }
+.leaflet-control-scale-line { background: ${alpha(T.bg1, 0.85)}; color: ${T.text}; border-color: ${T.textDim}; text-shadow: none; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: ${T.bg1}; color: ${T.text}; }
+.leaflet-popup-tip { box-shadow: none; border: 1px solid ${T.borderMid}; }
+.leaflet-popup-content-wrapper { border: 1px solid ${T.borderMid}; }
+.leaflet-container a.leaflet-popup-close-button { color: ${T.textDim}; }
+.leaflet-container a.leaflet-popup-close-button:hover, .leaflet-container a.leaflet-popup-close-button:focus { color: ${T.textStrong}; }
+.leaflet-tooltip-top:before { border-top-color: ${T.bg1}; }
+.leaflet-tooltip-bottom:before { border-bottom-color: ${T.bg1}; }
+.leaflet-tooltip-left:before { border-left-color: ${T.bg1}; }
+.leaflet-tooltip-right:before { border-right-color: ${T.bg1}; }
+`;
+
+const css = themed(() => `
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
@@ -24,11 +48,14 @@ button:disabled { cursor: default; opacity: 0.6; }
 :focus-visible { outline: 2px solid ${T.blueFill}; outline-offset: 2px; }
 code, .mono { font-family: ${FONT.mono}; font-variant-numeric: tabular-nums; }
 .num { font-variant-numeric: tabular-nums; }
+.nowrap { white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ── shell ── */
 .app { position: relative; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 .mainnav { display: flex; align-items: center; gap: 4px; padding: 0 16px; background: ${T.bg1}; border-bottom: 1px solid ${T.border}; flex-shrink: 0; }
+.mainnav-tabs { display: flex; align-items: center; gap: 4px; }
+.theme-toggle { margin-left: auto; }
 .tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 12px; font-size: ${px(FS.sm)}; font-weight: 600; letter-spacing: 0.06em; color: ${T.textDim}; white-space: nowrap; }
 .tab:hover { color: ${T.text}; }
 .tab[aria-selected="true"] { color: ${T.blue}; border-bottom-color: ${T.blueFill}; }
@@ -98,6 +125,8 @@ code, .mono { font-family: ${FONT.mono}; font-variant-numeric: tabular-nums; }
 .btn-primary:hover { background: ${T.blue}; }
 .btn-small { font-size: ${px(FS.sm)}; padding: 4px 10px; }
 .linkbtn { background: none; border: none; padding: 0; color: ${T.blue}; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; height: 28px; padding: 0; border-radius: ${px(RADIUS.md)}; border: 1px solid ${T.borderMid}; background: ${T.bg1}; color: ${T.textMuted}; }
+.icon-btn:hover { background: ${T.bg3}; color: ${T.textStrong}; }
 
 /* ── banners ── */
 .banner { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: ${px(RADIUS.sm)}; border: 1px solid; font-size: ${px(FS.sm)}; font-weight: 700; letter-spacing: 0.04em; }
@@ -244,8 +273,8 @@ code, .mono { font-family: ${FONT.mono}; font-variant-numeric: tabular-nums; }
 .map-hz-pulse { animation: map-hz 2s ease-in-out infinite; }
 @keyframes map-hz { 0%, 100% { fill-opacity: 0.3; stroke-opacity: 0.95; } 50% { fill-opacity: 0.1; stroke-opacity: 0.5; } }
 .map-pin { background: none; border: none; }
-.map-pin-body { position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: ${T.bg1}; border: 2px solid ${T.bg1}; box-shadow: ${SHADOW.pop}; }
-.map-pin-body::after { content: ""; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid ${T.bg1}; }
+.map-pin-body { position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: ${MARKER.ring}; border: 2px solid ${MARKER.ring}; box-shadow: ${SHADOW.pop}; }
+.map-pin-body::after { content: ""; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid ${MARKER.ring}; }
 .map-pin-fire .map-pin-body { background: ${T.redFill}; }
 .map-pin-fall .map-pin-body { background: ${T.redFill}; }
 .map-pin-still .map-pin-body { background: ${T.amberFill}; }
@@ -253,7 +282,7 @@ code, .mono { font-family: ${FONT.mono}; font-variant-numeric: tabular-nums; }
 .map-pin-side .map-pin-body::after { display: none; }
 .map-pin-side svg { width: 12px; height: 12px; }
 .map-cp { background: none; border: none; }
-.map-cp-body { display: flex; align-items: center; justify-content: center; width: 36px; height: 26px; border-radius: ${px(RADIUS.sm)}; background: ${T.textStrong}; color: ${T.bg1}; font-size: ${px(FS.sm)}; font-weight: 700; letter-spacing: 0.08em; border: 2px solid ${T.bg1}; box-shadow: ${SHADOW.pop}; cursor: move; }
+.map-cp-body { display: flex; align-items: center; justify-content: center; width: 36px; height: 26px; border-radius: ${px(RADIUS.sm)}; background: ${MARKER.ink}; color: ${MARKER.ring}; font-size: ${px(FS.sm)}; font-weight: 700; letter-spacing: 0.08em; border: 2px solid ${MARKER.ring}; box-shadow: ${SHADOW.pop}; cursor: move; }
 .map-ctl { position: absolute; top: 10px; right: 10px; z-index: 1100; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100% - 70px); }
 .map-ctl-box { background: ${T.bg1}; border: 1px solid ${T.borderMid}; border-radius: ${px(RADIUS.md)}; box-shadow: ${SHADOW.pop}; padding: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .map-ctl-label { font-size: ${px(FS.xs)}; font-weight: 600; letter-spacing: 0.06em; color: ${T.textDim}; padding: 0 4px; text-transform: uppercase; }
@@ -269,7 +298,7 @@ code, .mono { font-family: ${FONT.mono}; font-variant-numeric: tabular-nums; }
 .legend-item { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .legend-item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .legend-sw { width: 24px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
-.legend-cp { display: inline-flex; align-items: center; justify-content: center; height: 16px; padding: 0 3px; border-radius: 3px; background: ${T.textStrong}; color: ${T.bg1}; font-size: ${px(FS.xs)}; font-weight: 700; letter-spacing: 0.04em; line-height: 1; }
+.legend-cp { display: inline-flex; align-items: center; justify-content: center; height: 16px; padding: 0 3px; border-radius: 3px; background: ${MARKER.ink}; color: ${MARKER.ring}; box-shadow: 0 0 0 1px ${MARKER.ring}; font-size: ${px(FS.xs)}; font-weight: 700; letter-spacing: 0.04em; line-height: 1; }
 .swatch { width: 14px; height: 14px; border-radius: 50%; border: 2px solid; display: inline-block; }
 .swatch-line { width: 16px; height: 4px; border-radius: 2px; display: inline-block; }
 .map-overlay-note { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 1050; max-width: 320px; text-align: center; background: ${T.bg1}; border: 1px solid ${T.borderMid}; border-radius: ${px(RADIUS.md)}; box-shadow: ${SHADOW.pop}; padding: 10px 14px; font-size: ${px(FS.sm)}; color: ${T.textMuted}; pointer-events: none; }
@@ -297,8 +326,9 @@ code, .mono { font-family: ${FONT.mono}; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   .resp-card.is-p0, .banner.is-live, .counter.is-blinking .counter-value, .map-pulse-ring, .map-hz-pulse, .spinner { animation: none !important; }
 }
-`;
+${themeMode() === 'dark' ? darkMapCss() : ''}`);
 
 export default function GlobalStyles() {
-  return <style>{CSS}</style>;
+  useTheme();
+  return <style>{css()}</style>;
 }

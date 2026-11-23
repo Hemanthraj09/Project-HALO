@@ -1,7 +1,8 @@
 // HALO command dashboard.
 //
-// App = global styles + the dashboard. There is no sign-in (the user's decision, 2026-11-22):
-// the database rules in ../database.rules.json allow public reads and deny all client writes.
+// App = theme provider + global styles + the dashboard. There is no sign-in (the user's decision,
+// 2026-11-22): the database rules in ../database.rules.json allow public reads and deny all client
+// writes.
 // The LIVE tab is the responder list, the operational map, the responder detail and the alert
 // log; the ANALYTICS tab is AnalyticsView (src/analytics, written by the analytics agent).
 
@@ -13,12 +14,15 @@ import GlobalStyles from './components/GlobalStyles';
 import NotAuthorised from './components/NotAuthorised';
 import ResponderList from './components/ResponderList';
 import SituationBar from './components/SituationBar';
+import ThemeToggle from './components/ThemeToggle';
 import { useLostIds } from './lib/clock';
 import { useLiveData, useReadings } from './lib/db';
 import { sortResponderIds } from './lib/status';
+import { ThemeProvider, useTheme } from './lib/themeMode';
 import MapPanel from './map/MapPanel';
 
 function Dashboard({ user, signOut, signOutError }) {
+  useTheme();
   const [attempt, setAttempt] = useState(0);
   const [chosenId, setChosenId] = useState(null);
   // Counts selections, so re-selecting the responder already selected still turns map follow on.
@@ -62,13 +66,16 @@ function Dashboard({ user, signOut, signOutError }) {
         signOutError={signOutError}
         onPick={pick}
       />
-      <div className="mainnav" role="tablist" aria-label="Main views">
-        <button type="button" role="tab" className="tab" aria-selected={mainTab === 'live'} onClick={() => setMainTab('live')}>
-          LIVE
-        </button>
-        <button type="button" role="tab" className="tab" aria-selected={mainTab === 'analytics'} onClick={() => setMainTab('analytics')}>
-          ANALYTICS
-        </button>
+      <div className="mainnav">
+        <div className="mainnav-tabs" role="tablist" aria-label="Main views">
+          <button type="button" role="tab" className="tab" aria-selected={mainTab === 'live'} onClick={() => setMainTab('live')}>
+            LIVE
+          </button>
+          <button type="button" role="tab" className="tab" aria-selected={mainTab === 'analytics'} onClick={() => setMainTab('analytics')}>
+            ANALYTICS
+          </button>
+        </div>
+        <ThemeToggle />
       </div>
 
       {mainTab === 'analytics' ? (
@@ -122,9 +129,9 @@ function Dashboard({ user, signOut, signOutError }) {
 
 export default function App() {
   return (
-    <>
+    <ThemeProvider>
       <GlobalStyles />
       <Dashboard user={null} />
-    </>
+    </ThemeProvider>
   );
 }

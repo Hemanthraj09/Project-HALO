@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Layers, LocateFixed } from 'lucide-react';
-import { T } from '../theme';
+import { MARKER, T } from '../theme';
 import { HAZARD_WINDOWS } from '../lib/hazards';
 
 export const LAYERS = [
@@ -25,9 +25,9 @@ function Line({ color }) {
 // Symbol names only; the colours follow the same P0 / P1 / P2 scheme as the rest of the dashboard.
 function Legend() {
   const items = [
-    [<Dot key="p0" fill={T.redFill} stroke={T.bg1} />, 'P0 MAYDAY'],
-    [<Dot key="p1" fill={T.amberFill} stroke={T.bg1} />, 'P1 WARNING'],
-    [<Dot key="p2" fill={T.greenFill} stroke={T.bg1} />, 'P2 NOMINAL'],
+    [<Dot key="p0" fill={T.redFill} stroke={MARKER.ring} />, 'P0 MAYDAY'],
+    [<Dot key="p1" fill={T.amberFill} stroke={MARKER.ring} />, 'P1 WARNING'],
+    [<Dot key="p2" fill={T.greenFill} stroke={MARKER.ring} />, 'P2 NOMINAL'],
     [<Dot key="lost" fill={T.grayFill} stroke={T.redFill} dashed />, 'Link lost'],
     [<Dot key="stale" fill={T.greenBg} stroke={T.grayFill} dashed />, 'Stale fix'],
     [<Dot key="acc" fill={T.blueBg} stroke={T.blueFill} />, 'GPS accuracy'],
@@ -35,9 +35,9 @@ function Legend() {
     [<Dot key="co" fill={T.orangeBg} stroke={T.orangeFill} />, 'CO'],
     [<Dot key="air" fill={T.purpleBg} stroke={T.purpleFill} />, 'Smoke'],
     [<Dot key="heat" fill={T.amberBg} stroke={T.amberFill} />, 'Heat'],
-    [<Dot key="fire" fill={T.redFill} stroke={T.bg1} />, 'Possible fire'],
-    [<Dot key="fall" fill={T.redFill} stroke={T.bg1} />, 'Fall'],
-    [<Dot key="still" fill={T.amberFill} stroke={T.bg1} />, 'No motion'],
+    [<Dot key="fire" fill={T.redFill} stroke={MARKER.ring} />, 'Possible fire'],
+    [<Dot key="fall" fill={T.redFill} stroke={MARKER.ring} />, 'Fall'],
+    [<Dot key="still" fill={T.amberFill} stroke={MARKER.ring} />, 'No motion'],
     [<Line key="trail" color={T.blueFill} />, 'Trail'],
     [<span key="cp" className="legend-cp">CP</span>, 'Command post'],
   ];

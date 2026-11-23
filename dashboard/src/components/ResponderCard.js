@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { Axis3d, MapPin, MapPinOff, Signal, Siren, Hourglass, Unplug } from 'lucide-react';
+import { useTheme } from '../lib/themeMode';
 import { T } from '../theme';
 import { aqValue, armValue, coValue, coreValue, ppgValue, psiValue, twaValue } from '../lib/format';
 import { gpsState } from '../lib/geo';
@@ -13,7 +14,7 @@ import { aqBand, coBand, coreBand, heatBand, hrBand, psiBand, spo2Band, twaBand 
 import { recordMs } from '../lib/time';
 import StatusBadge from './StatusBadge';
 import { Age } from './TimeText';
-import { Banner, Tile } from './ui';
+import { Banner, SatsNote, Tile } from './ui';
 
 function LinkLine({ r }) {
   const parts = [];
@@ -33,7 +34,10 @@ function GpsLine({ r, lost }) {
     return (
       <div className="rc-line">
         <MapPinOff size={14} aria-hidden="true" />
-        <span>{g.text}</span>
+        <span>
+          {g.text}
+          <SatsNote sats={g.sats} />
+        </span>
       </div>
     );
   }
@@ -51,12 +55,16 @@ function GpsLine({ r, lost }) {
   return (
     <div className="rc-line" style={{ color: T.amber }}>
       <MapPin size={14} aria-hidden="true" />
-      <span>{g.fixMs !== null ? <Age since={g.fixMs} prefix="Last fix " suffix=" ago" /> : 'Stale fix'}</span>
+      <span>
+        {g.fixMs !== null ? <Age since={g.fixMs} prefix="Last fix " suffix=" ago" /> : 'Stale fix'}
+        <SatsNote sats={g.sats} />
+      </span>
     </div>
   );
 }
 
 function ResponderCard({ id, r, lost, selected, onSelect }) {
+  useTheme();
   const st = responderStatus(r, lost);
   const packetMs = recordMs(r);
   const hr = ppgValue(r, 'hr');

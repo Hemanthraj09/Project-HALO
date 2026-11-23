@@ -2,12 +2,14 @@
 // reason, responder and time. Device-supplied text is rendered as JSX text.
 
 import React from 'react';
+import { useTheme } from '../lib/themeMode';
 import { SEVERITY, T } from '../theme';
 import { fmtStamp } from '../lib/time';
 import { EVENT_META } from './icons';
 import { SeverityChip } from './ui';
 
 function AlertRow({ a, onPick, showResponder = true }) {
+  useTheme();
   const sev = a.priority === null ? null : SEVERITY[a.priority];
   const ev = EVENT_META[a.event || 'legacy'];
   const Icon = ev.Icon;

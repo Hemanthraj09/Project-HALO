@@ -5,7 +5,8 @@
 
 import { memo, useMemo } from 'react';
 import { BarChart3, Lightbulb } from 'lucide-react';
-import { T, FONT, FS } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { T, FONT, FS, themed } from '../theme';
 import {
   MINUTES_QUERY_LIMIT, MINUTE_MS, RANGE_12H_MS,
   buildInsights, buildKpis, buildMinuteSeries, fmtSpan, isSafeKey, mergeSummaries,
@@ -25,7 +26,7 @@ const RANGE_OPTIONS = [
 const NONE = [];
 const NOT_LOADED = { profile: false, sessions: false, minutes: false };
 
-const rootStyle = {
+const rootStyle = themed(() => ({
   flex: 1,
   minWidth: 0,
   minHeight: 0,
@@ -37,7 +38,7 @@ const rootStyle = {
   color: T.text,
   fontFamily: FONT.ui,
   fontSize: FS.md,
-};
+}));
 
 const gridStyle = {
   display: 'grid',
@@ -80,6 +81,7 @@ export function AnalyticsPanel({
   id = null, ids = NONE, onPickId, profile = null, sessions = NONE, minutes = NONE, loaded = NOT_LOADED, error = null,
   rangeMinutes = NONE, rangeLoaded = true, modeChoice = 'session', onMode, sessionKey = null, onSession, now, onRetry,
 }) {
+  useTheme();
   const { latest, session, isLatest, mode, needRange } = useMemo(
     () => selectView(sessions, minutes, modeChoice, sessionKey), [sessions, minutes, modeChoice, sessionKey]);
 
@@ -146,7 +148,7 @@ export function AnalyticsPanel({
   }
 
   return (
-    <div style={rootStyle}>
+    <div style={rootStyle()}>
       {header}
       {body}
     </div>
@@ -156,6 +158,7 @@ export function AnalyticsPanel({
 const AnalyticsBody = memo(function AnalyticsBody({
   kpis, insights, summary, rows, domain, ticks, withDate, span, hrMax, windowMinutes, compare, mode, loadingRange, truncated,
 }) {
+  useTheme();
   const chartProps = { rows, domain, ticks, withDate, span };
   let chartsNote = null;
   if (!windowMinutes.length) chartsNote = mode === 'session' ? 'No minute data for this session.' : 'No minute data in the last 12 h.';

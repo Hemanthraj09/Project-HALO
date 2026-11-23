@@ -6,7 +6,7 @@
   Receives the arm strap packet over ESP-NOW (binary v2, 60 bytes), adds GPS, CO,
   air quality and the chest battery, and sends one binary LoRa packet (v2, 62 bytes,
   about 370 ms on air) to the gateway:
-    P0 MAYDAY every 1 s · P1 WARNING every 2 s · P2 NOMINAL every 5 s,
+    P0 MAYDAY every 1 s · P1 WARNING every 2 s · P2 NOMINAL every 2 s,
     and at once when the priority escalates (e.g. a fall arrives).
   Keeps sensing and transmitting CO / AQI / GPS / battery when the arm strap is silent
   (the packet then says ARM:0 and the priority is at least P1). Keeps sensing and
@@ -79,7 +79,7 @@
     MQ7_R0 comment corrected.
   - Chest battery on GPIO 33, with an optional load-drop correction (BATT_LOAD_COMP_MV).
   - LoRa: register read-back after init, health check every 2 s, TX watchdog, re-init with
-    backoff 1-30 s. TX every 1 / 2 / 5 s (was 2 / 3 / 5 s), radio asleep between packets,
+    backoff 1-30 s. TX every 1 / 2 / 2 s (was 2 / 3 / 5 s), radio asleep between packets,
     CPU at 80 MHz.
   - MQ warm-up: for the first 180 s after boot, CO, CO saturation and AQI do not raise the TX
     priority (cold heaters read high). The readings are still sent; the status line shows
@@ -132,7 +132,13 @@
 #define GPS_RX   16
 #define GPS_TX   17
 #define GPS_BAUD 9600
-#define MAX_HDOP 3.0              // reject fixes with poor satellite geometry
+#define MAX_HDOP 3.0              // good geometry: always accepted
+#define GPS_HDOP_RELAXED 6.0      // weaker geometry: accepted only when no fix was accepted for GPS_RELAX_AFTER_S
+#define GPS_RELAX_AFTER_S   5     // half of GPS_FRESH_S, so the position refreshes before it would show as stale
+#define GPS_STILL_MPS       0.5   // receiver ground speed below this = wearer standing still ...
+#define GPS_MOVING_FAST_MPS 1.5   // ... moving = 2 fixes in a row at >= GPS_STILL_MPS, or 1 fix at this speed
+#define GPS_STILL_RADIUS_M  15.0  // averaging radius while still: max(this, 6 m per HDOP unit) ...
+#define GPS_STILL_OUTLIERS  3     // ... a fix outside it is ignored unless this many arrive in a row
 #define MIN_SATS 4
 #define GPS_GEOM_MAX_AGE_MS 3000  // HDOP / satellite count must come from a GGA sentence this recent
 #define GPS_MAX_SPEED_MPS   50.0  // reject a fix that implies moving faster than this ...
@@ -514,6 +520,10 @@ struct gps_track {
   double   alt_m;         // altitude of the last fix that had one
   uint32_t fix_ms;        // millis() when the last fix was accepted
   uint32_t rej_geometry;  // fixes rejected for HDOP / satellite count / range
+  bool     sm_valid;      // smoothed position (what the packet sends)
+  double   sm_lat, sm_lng;
+  uint8_t  sm_far;        // consecutive still fixes outside the averaging radius
+  uint8_t  sm_moving;     // consecutive fixes at >= GPS_STILL_MPS
   uint32_t rej_jump;      // fixes rejected by the speed filter
 };
 
@@ -532,7 +542,14 @@ static double gps_distance_m(double lat1, double lng1, double lat2, double lng2)
 // Returns 0 accepted, 1 rejected (geometry or range), 2 rejected (implies > GPS_MAX_SPEED_MPS).
 static int gps_offer_fix(gps_track *t, double lat, double lng, bool alt_valid, double alt_m,
                          double hdop, uint32_t sats, uint32_t now_ms) {
-  bool geometry_ok = hdop >= 0.0 && hdop <= MAX_HDOP && sats >= MIN_SATS &&
+  // Prefer good geometry (HDOP <= MAX_HDOP). Near buildings or a window HDOP often sits at 3.5-6
+  // for minutes; rejecting all of those left the position stale although the module was tracking.
+  // So when no fix has been accepted for GPS_RELAX_AFTER_S (or ever), a weaker one up to
+  // GPS_HDOP_RELAXED is taken. The packet carries HDOP, so the dashboard's accuracy ring widens.
+  bool need_fix = !t->have_fix || t->age_pinned ||
+                  (uint32_t)(now_ms - t->fix_ms) >= (uint32_t)GPS_RELAX_AFTER_S * 1000u;
+  double max_hdop = need_fix ? GPS_HDOP_RELAXED : MAX_HDOP;
+  bool geometry_ok = hdop >= 0.0 && hdop <= max_hdop && sats >= MIN_SATS &&
                      lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0;
   if (!geometry_ok) {
     t->rej_geometry++;
@@ -555,6 +572,36 @@ static int gps_offer_fix(gps_track *t, double lat, double lng, bool alt_valid, d
   if (alt_valid) t->alt_m = alt_m;
   t->fix_ms     = now_ms;
   return 0;
+}
+
+// Smoothing for a wearer who is standing still. Fixes wander 5-30 m around the true spot (more at
+// high HDOP), which the dashboard drew as a zig-zag trail. The receiver's own ground speed
+// (Doppler-based, far more accurate than position differences) decides "still" vs "moving".
+// While still, each fix is averaged in, weighted by HDOP; a single fix outside the averaging
+// radius is jitter and is ignored, and GPS_STILL_OUTLIERS of them in a row restart the average
+// there. While moving (or with no speed), the reported position is the fix itself, so real
+// movement is never delayed by more than one fix. speed_mps < 0 = unknown.
+static void gps_smooth(gps_track *t, double lat, double lng, double hdop, double speed_mps) {
+  if (speed_mps >= GPS_STILL_MPS) { if (t->sm_moving < 255) t->sm_moving++; }
+  else t->sm_moving = 0;
+  bool moving = speed_mps < 0.0 || speed_mps >= GPS_MOVING_FAST_MPS || t->sm_moving >= 2;
+  if (!t->sm_valid || moving) {
+    t->sm_lat = lat; t->sm_lng = lng; t->sm_valid = true; t->sm_far = 0;
+    return;
+  }
+  double h = hdop > 1.0 ? hdop : 1.0;
+  double radius = 6.0 * h > GPS_STILL_RADIUS_M ? 6.0 * h : GPS_STILL_RADIUS_M;
+  if (gps_distance_m(t->sm_lat, t->sm_lng, lat, lng) > radius) {
+    if (++t->sm_far >= GPS_STILL_OUTLIERS) {   // persistently elsewhere: move there
+      t->sm_lat = lat; t->sm_lng = lng; t->sm_far = 0;
+    }
+    return;
+  }
+  t->sm_far = 0;
+  double a = 0.4 / h;                         // HDOP 2 -> 0.20, 4 -> 0.10, 6 -> 0.067
+  if (a > 0.4) a = 0.4;
+  t->sm_lat += a * (lat - t->sm_lat);
+  t->sm_lng += a * (lng - t->sm_lng);
 }
 
 // Seconds since the last accepted fix; 65535 = never, pinned at 65534 once that old.
@@ -1292,7 +1339,10 @@ static void feedGPS(uint32_t now) {
                     ? gps.satellites.value() : 0;
   bool altOk = gps.altitude.isValid();
   double alt = altOk ? gps.altitude.meters() : 0.0;
-  gps_offer_fix(&gpsTrack, lat, lng, altOk, alt, hdop, sats, now);
+  if (gps_offer_fix(&gpsTrack, lat, lng, altOk, alt, hdop, sats, now) == 0) {
+    double spd = (gps.speed.isValid() && gps.speed.age() <= GPS_GEOM_MAX_AGE_MS) ? gps.speed.mps() : -1.0;
+    gps_smooth(&gpsTrack, lat, lng, hdop, spd);
+  }
 }
 
 // ─── ADC ──────────────────────────────────────────────────────────
@@ -1355,8 +1405,8 @@ static void buildPacket(lora_packet_t *p, uint32_t now, uint64_t *actSum, uint32
   f.arm_sensors = a.pkt.sensors;
 
   f.have_fix  = gpsTrack.have_fix;
-  f.lat       = gpsTrack.lat;
-  f.lng       = gpsTrack.lng;
+  f.lat       = gpsTrack.sm_valid ? gpsTrack.sm_lat : gpsTrack.lat;   // smoothed while standing still
+  f.lng       = gpsTrack.sm_valid ? gpsTrack.sm_lng : gpsTrack.lng;
   f.gps_alt_m = gpsTrack.alt_m;
   f.gps_age_s = gps_age_s(&gpsTrack, now);
   f.gps_fresh = f.gps_age_s <= GPS_FRESH_S;

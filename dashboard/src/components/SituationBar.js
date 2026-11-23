@@ -4,6 +4,7 @@
 
 import React, { useMemo } from 'react';
 import { LogOut, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { useTheme } from '../lib/themeMode';
 import { SEVERITY, T } from '../theme';
 import { collectActiveAlerts, countResponders } from '../lib/status';
 import { typeIcon } from './icons';
@@ -52,6 +53,7 @@ function Ticker({ active, onPick }) {
 }
 
 function SituationBar({ responders, lostIds, connected, user, onSignOut, signOutError, onPick }) {
+  useTheme();
   const counts = useMemo(() => countResponders(responders, lostIds), [responders, lostIds]);
   const active = useMemo(() => collectActiveAlerts(responders, lostIds), [responders, lostIds]);
   // backend started with HALO_BENCH=1: no-motion (man-down) alerts are off for a strap on a table

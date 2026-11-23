@@ -1,23 +1,25 @@
 // Presentational pieces shared by the analytics charts: cards, legend, tooltips, KPI tiles,
 // controls and notices. Text from the database (ids, method strings) is rendered as JSX text only.
+// The shared style objects are built per theme (themed): read them while rendering.
 
 import { memo, useState } from 'react';
 import { AlertTriangle, Info, RefreshCw, Table2 } from 'lucide-react';
-import { T, FONT, FS, RADIUS, SHADOW, SEVERITY } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { T, FONT, FS, RADIUS, SHADOW, SEVERITY, themed } from '../theme';
 import { fmtDate, fmtHM } from './metrics';
 
 export const NUM = { fontVariantNumeric: 'tabular-nums' };
 
-const cardStyle = {
+const cardStyle = themed(() => ({
   background: T.bg2,
   border: `1px solid ${T.border}`,
   borderRadius: RADIUS.md,
   boxShadow: SHADOW.card,
   padding: 16,
   minWidth: 0,
-};
+}));
 
-const buttonStyle = {
+const buttonStyle = themed(() => ({
   display: 'inline-flex',
   alignItems: 'center',
   gap: 6,
@@ -31,11 +33,11 @@ const buttonStyle = {
   fontSize: FS.sm,
   fontWeight: 500,
   cursor: 'pointer',
-};
+}));
 
 export function Card({ title, icon: Icon, children, style }) {
   return (
-    <section style={{ ...cardStyle, ...style }} aria-label={title}>
+    <section style={{ ...cardStyle(), ...style }} aria-label={title}>
       {title && (
         <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 12px', fontSize: FS.lg, fontWeight: 600, color: T.textStrong }}>
           {Icon && <Icon size={16} color={T.textMuted} aria-hidden="true" />}
@@ -53,14 +55,14 @@ export function ChartCard({ title, subtitle, legend, table, empty, children, sty
   const [showTable, setShowTable] = useState(false);
   const canTable = Boolean(table && table.rows && table.rows.length) && !empty;
   return (
-    <section style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 8, ...style }} aria-label={title}>
+    <section style={{ ...cardStyle(), display: 'flex', flexDirection: 'column', gap: 8, ...style }} aria-label={title}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h3 style={{ margin: 0, fontSize: FS.lg, fontWeight: 600, color: T.textStrong }}>{title}</h3>
           {subtitle && <div style={{ marginTop: 2, fontSize: FS.sm, color: T.textDim, ...NUM }}>{subtitle}</div>}
         </div>
         {canTable && (
-          <button type="button" style={buttonStyle} aria-pressed={showTable} onClick={() => setShowTable((v) => !v)}>
+          <button type="button" style={buttonStyle()} aria-pressed={showTable} onClick={() => setShowTable((v) => !v)}>
             <Table2 size={14} aria-hidden="true" />
             {showTable ? 'Chart' : 'Table'}
           </button>
@@ -147,7 +149,7 @@ export function TableView({ caption, columns, rows }) {
   );
 }
 
-const tooltipBox = {
+const tooltipBox = themed(() => ({
   background: T.bg2,
   border: `1px solid ${T.borderMid}`,
   borderRadius: RADIUS.sm,
@@ -158,7 +160,7 @@ const tooltipBox = {
   color: T.text,
   minWidth: 150,
   ...NUM,
-};
+}));
 
 function TooltipRow({ color, kind, value, label }) {
   return (
@@ -177,7 +179,7 @@ export function TimeTooltip({ active, payload, series, withDate }) {
   const row = payload[0] && payload[0].payload;
   if (!row || row.gap) return null;
   return (
-    <div style={tooltipBox}>
+    <div style={tooltipBox()}>
       <div style={{ fontWeight: 600, color: T.textStrong, marginBottom: 4 }}>
         {withDate ? `${fmtDate(row.t)} ` : ''}{fmtHM(row.t)}
       </div>
@@ -195,7 +197,7 @@ export function BarTooltip({ active, payload, title, rowsOf }) {
   const row = payload[0] && payload[0].payload;
   if (!row) return null;
   return (
-    <div style={tooltipBox}>
+    <div style={tooltipBox()}>
       <div style={{ fontWeight: 600, color: T.textStrong, marginBottom: 4 }}>{title(row)}</div>
       {rowsOf(row).map((r) => <TooltipRow key={r.key} color={r.color} kind={r.kind || 'bar'} label={r.label} value={r.value} />)}
     </div>
@@ -219,9 +221,10 @@ export function StatusChip({ level, text }) {
 // value, sub-line), so values and sub-lines line up across a row of tiles even when one label row
 // wraps. A status chip that does not fit beside the label wraps under it instead of squeezing it.
 export const KpiTile = memo(function KpiTile({ tile }) {
+  useTheme();
   return (
     <div role="listitem" style={{
-      ...cardStyle, padding: '12px 14px', display: 'grid', gridRow: 'span 3', gridTemplateRows: 'subgrid', rowGap: 4, alignContent: 'start',
+      ...cardStyle(), padding: '12px 14px', display: 'grid', gridRow: 'span 3', gridTemplateRows: 'subgrid', rowGap: 4, alignContent: 'start',
     }}>
       <div style={{
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', alignContent: 'flex-start', justifyContent: 'space-between', gap: '4px 6px', minHeight: 18,
@@ -292,7 +295,7 @@ export function Notice({ kind, title, children, action }) {
   const { Icon } = tone;
   return (
     <div role={kind === 'error' ? 'alert' : 'status'}
-      style={{ ...cardStyle, display: 'flex', gap: 12, alignItems: children || action ? 'flex-start' : 'center' }}>
+      style={{ ...cardStyle(), display: 'flex', gap: 12, alignItems: children || action ? 'flex-start' : 'center' }}>
       <span style={{ display: 'inline-flex', padding: 6, borderRadius: RADIUS.sm, background: tone.bg }}>
         <Icon size={18} color={tone.color} aria-hidden="true" />
       </span>
@@ -307,7 +310,7 @@ export function Notice({ kind, title, children, action }) {
 
 export function RetryButton({ onClick }) {
   return (
-    <button type="button" style={buttonStyle} onClick={onClick}>
+    <button type="button" style={buttonStyle()} onClick={onClick}>
       <RefreshCw size={14} aria-hidden="true" />
       Retry
     </button>

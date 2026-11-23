@@ -1,8 +1,8 @@
-// Operational map. OSM tiles in normal colours, zoom control, scale bar, follow mode, responder
-// markers with accuracy circles and sensing halos, hazard zones, the selected responder's trail
-// and a draggable command post. Custom panes keep the draw order fixed when layers are toggled:
-// halos < hazard zones < accuracy < trail < command post < hazard pins < responders
-// (< Leaflet tooltips and popups).
+// Operational map. OSM tiles (darkened in the dark theme), zoom control, scale bar, follow mode,
+// responder markers with accuracy circles and sensing halos, hazard zones, the selected
+// responder's trail and a draggable command post. Custom panes keep the draw order fixed when
+// layers are toggled: halos < hazard zones < accuracy < trail < command post < hazard pins <
+// responders (< Leaflet tooltips and popups).
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { MapContainer, Pane, TileLayer } from 'react-leaflet';
@@ -11,6 +11,7 @@ import { useEvery } from '../lib/clock';
 import { isLatLonPair, validLatLon } from '../lib/geo';
 import { filterHazards, isHazardWindow } from '../lib/hazards';
 import { useStoredState } from '../lib/storage';
+import { useTheme } from '../lib/themeMode';
 import { AccessNotice } from '../components/NotAuthorised';
 import { Panel } from '../components/ui';
 import CommandPost from './CommandPost';
@@ -46,6 +47,7 @@ const paneStyle = (z) => ({ zIndex: z });
 
 // selectSeq changes on every selection, including a click on the responder already selected.
 function MapPanel({ responders, lostIds, selectedId, selectSeq, readings, hazards, hazardsError, user, onSelect }) {
+  useTheme();
   const [follow, setFollow] = useState(true);
   const [storedLayers, setLayers] = useStoredState('halo.map.layers.v1', DEFAULT_LAYERS, isLayerState);
   const [hzWindow, setHzWindow] = useStoredState('halo.map.hazardWindow.v1', 'active', isHazardWindow);

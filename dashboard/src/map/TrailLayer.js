@@ -1,13 +1,16 @@
-// Trail of the selected responder from readings/<id> (gps_ok points only): polyline segments
-// coloured by CO band, with small dots where CO > 35 ppm (hover shows the value and time).
+// Trail of the selected responder from readings/<id> (gps_ok points only, GPS jitter merged by
+// buildTrail): polyline segments coloured by CO band, with small dots on trail points where CO
+// went above 35 ppm (hover shows the highest value there and when it was read).
 
 import React, { useMemo } from 'react';
 import { CircleMarker, Polyline, Tooltip } from 'react-leaflet';
+import { useTheme } from '../lib/themeMode';
 import { fmtStamp } from '../lib/time';
 import { buildTrail, TOOLTIP_PANE } from './mapData';
 
 function TrailLayer({ readings }) {
-  const trail = useMemo(() => buildTrail(readings), [readings]);
+  const { tokens } = useTheme();
+  const trail = useMemo(() => buildTrail(readings, tokens), [readings, tokens]);
   return (
     <>
       {trail.lines.map((l, i) => {

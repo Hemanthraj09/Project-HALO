@@ -4,6 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { ScanSearch } from 'lucide-react';
 import { buildSeries, CHART_POINTS } from '../lib/series';
+import { useTheme } from '../lib/themeMode';
 import { responderStatus } from '../lib/status';
 import { recordMs } from '../lib/time';
 import AlertsTab from './AlertsTab';
@@ -25,6 +26,7 @@ const TABS = [
 ];
 
 function DeepDivePanel({ id, r, lost, readings, alerts, user, onPick }) {
+  useTheme();
   const [tab, setTab] = useState('vitals');
   const series = useMemo(() => buildSeries(readings.list, CHART_POINTS), [readings.list]);
 

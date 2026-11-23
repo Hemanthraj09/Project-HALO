@@ -1,39 +1,49 @@
 // Physiology charts: heart rate with zone bands, time in zones, physiological strain,
-// SpO2 and HR recovery. Each chart takes pre-built rows (metrics.buildMinuteSeries) and is memoised.
+// SpO2 and HR recovery. Each chart takes pre-built rows (metrics.buildMinuteSeries) and is memoised;
+// it also re-renders on a theme switch (useTheme).
 
 import { memo, useMemo } from 'react';
 import {
   Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line, ReferenceArea, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { T, FS, RADIUS } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { T, FS, RADIUS, themed } from '../theme';
 import {
   CORE_CRIT_C, CORE_WARN_C, HR_ZONES, PSI_BANDS, SPO2_CRITICAL, SPO2_LOW,
   fmtFixed, fmtHM, fmtInt, fmtMinutes, hrDomain, niceTicks, seriesExtent, seriesHas, zoneBands, zoneBarData,
 } from './metrics';
-import { PSI_BAND_FILLS, SERIES, ZONE_COLORS } from './palette';
+import { chartColors } from './palette';
 import { BarTooltip, ChartCard, EmptyNote, NUM, TimeTooltip } from './ui';
 import {
-  AXIS_TICK, BAR_CURSOR, GRID_PROPS, LINE_CURSOR, MARGIN, X_AXIS_HEIGHT,
-  activeDot, bandLabel, bandPx, isolatedDot, refLineLabel, timeAxisProps, yAxisProps,
+  MARGIN, X_AXIS_HEIGHT,
+  activeDot, axisTick, bandLabel, bandPx, barCursor, gridProps, isolatedDot, lineCursor, refLineLabel, timeAxisProps, yAxisProps,
 } from './chartKit';
 
-const DOT_INK = isolatedDot(SERIES.ink);
-const DOT_INK2 = isolatedDot(SERIES.inkSecondary);
-const DOT_SPO2 = isolatedDot(SERIES.spo2Avg);
-const DOT_SPO2_MIN = isolatedDot(SERIES.spo2Min);
+const dots = themed(() => {
+  const { SERIES } = chartColors();
+  return {
+    ink: isolatedDot(SERIES.ink),
+    ink2: isolatedDot(SERIES.inkSecondary),
+    spo2: isolatedDot(SERIES.spo2Avg),
+    spo2Min: isolatedDot(SERIES.spo2Min),
+  };
+});
 
 const missing = (v) => v === null || v === undefined;
 const bpm = (v) => (missing(v) ? '--' : `${Math.round(v)} bpm`);
 const zoneText = (z) => (missing(z) ? '--' : `${HR_ZONES[z].label} ${HR_ZONES[z].name}`);
 
-const panelLabel = { fontSize: FS.sm, fontWeight: 500, color: T.textMuted, marginTop: 4 };
+const panelLabel = themed(() => ({ fontSize: FS.sm, fontWeight: 500, color: T.textMuted, marginTop: 4 }));
 
 // ─── 1. HEART RATE ───────────────────────────────────────────────────────────
 
 const HR_HEIGHT = 240;
 
 export const HrChart = memo(function HrChart({ rows, domain, ticks, withDate, hrMax, span }) {
+  useTheme();
+  const { SERIES, ZONE_COLORS } = chartColors();
+  const dot = dots();
   const hrMaxV = hrMax ? hrMax.value : null;
   const yAxis = useMemo(() => {
     const [lo, hi] = hrDomain(rows, hrMaxV);
@@ -56,7 +66,7 @@ export const HrChart = memo(function HrChart({ rows, domain, ticks, withDate, hr
     { key: 'hr', label: '1-min average', color: SERIES.ink, kind: 'line', fmt: bpm },
     { key: 'hrRange', label: 'min–max', color: SERIES.rangeFill, kind: 'bar', fmt: (v) => (v ? `${Math.round(v[0])}–${Math.round(v[1])} bpm` : '--') },
     { key: 'zone', label: 'zone', kind: 'bar', colorOf: (r) => (missing(r.zone) ? T.border : ZONE_COLORS[r.zone]), fmt: zoneText },
-  ], []);
+  ], [SERIES, ZONE_COLORS]);
   const plotPx = HR_HEIGHT - X_AXIS_HEIGHT - MARGIN.top;
   const legend = [
     { label: '1-min average', color: SERIES.ink, kind: 'line' },
@@ -72,12 +82,12 @@ export const HrChart = memo(function HrChart({ rows, domain, ticks, withDate, hr
             <ReferenceArea key={b.key} y1={b.y1} y2={b.y2} fill={ZONE_COLORS[b.z]} fillOpacity={0.16} stroke="none"
               ifOverflow="hidden" label={bandLabel(b.label, bandPx(b.y1, b.y2, yDomain, plotPx))} />
           ))}
-          <CartesianGrid {...GRID_PROPS} />
+          <CartesianGrid {...gridProps()} />
           <XAxis {...timeAxisProps(domain, ticks)} />
           <YAxis {...yAxisProps({ domain: yDomain, ticks: yAxis.ticks, allowDecimals: false })} />
-          <Tooltip content={<TimeTooltip series={series} withDate={withDate} />} cursor={LINE_CURSOR} isAnimationActive={false} />
+          <Tooltip content={<TimeTooltip series={series} withDate={withDate} />} cursor={lineCursor()} isAnimationActive={false} />
           <Area type="linear" dataKey="hrRange" fill={SERIES.rangeFill} fillOpacity={0.22} stroke="none" isAnimationActive={false} activeDot={false} />
-          <Line type="linear" dataKey="hr" stroke={SERIES.ink} strokeWidth={2} dot={DOT_INK} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
+          <Line type="linear" dataKey="hr" stroke={SERIES.ink} strokeWidth={2} dot={dot.ink} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -86,15 +96,20 @@ export const HrChart = memo(function HrChart({ rows, domain, ticks, withDate, hr
 
 // ─── 2. TIME IN HR ZONES ─────────────────────────────────────────────────────
 
-const ZONE_TICK = { ...AXIS_TICK, fill: T.textMuted, fontWeight: 600 };
+const zoneTick = themed(() => ({ ...axisTick(), fill: T.textMuted, fontWeight: 600 }));
 
-const zoneRowsOf = (r) => [
-  { key: 'm', label: 'minutes', color: ZONE_COLORS[r.z], value: fmtMinutes(r.minutes) },
-  { key: 's', label: 'of HR time', color: ZONE_COLORS[r.z], value: r.share === null ? '--' : `${Math.round(r.share * 100)}%` },
-  ...(r.bpm ? [{ key: 'b', label: 'zone range', color: ZONE_COLORS[r.z], value: r.bpm }] : []),
-];
+const zoneRowsOf = (r) => {
+  const { ZONE_COLORS } = chartColors();
+  return [
+    { key: 'm', label: 'minutes', color: ZONE_COLORS[r.z], value: fmtMinutes(r.minutes) },
+    { key: 's', label: 'of HR time', color: ZONE_COLORS[r.z], value: r.share === null ? '--' : `${Math.round(r.share * 100)}%` },
+    ...(r.bpm ? [{ key: 'b', label: 'zone range', color: ZONE_COLORS[r.z], value: r.bpm }] : []),
+  ];
+};
 
 export const ZoneChart = memo(function ZoneChart({ zonesS, hrMax }) {
+  useTheme();
+  const { ZONE_COLORS } = chartColors();
   const hrMaxV = hrMax ? hrMax.value : null;
   const data = useMemo(() => zoneBarData(zonesS, hrMaxV), [zonesS, hrMaxV]);
   const has = Boolean(zonesS) && data.some((d) => d.minutes > 0);
@@ -113,10 +128,10 @@ export const ZoneChart = memo(function ZoneChart({ zonesS, hrMax }) {
       empty={has ? null : 'No valid heart rate in this window.'}>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ ...MARGIN, top: 20 }}>
-          <CartesianGrid {...GRID_PROPS} />
-          <XAxis dataKey="label" interval={0} height={X_AXIS_HEIGHT} tickLine={false} axisLine={{ stroke: T.borderMid }} tick={ZONE_TICK} />
+          <CartesianGrid {...gridProps()} />
+          <XAxis dataKey="label" interval={0} height={X_AXIS_HEIGHT} tickLine={false} axisLine={{ stroke: T.borderMid }} tick={zoneTick()} />
           <YAxis {...yAxisProps({ allowDecimals: false })} />
-          <Tooltip cursor={BAR_CURSOR} isAnimationActive={false}
+          <Tooltip cursor={barCursor()} isAnimationActive={false}
             content={<BarTooltip title={(r) => `${r.label} · ${r.name} (${r.range} HRmax)`} rowsOf={zoneRowsOf} />} />
           <Bar dataKey="minutes" maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false}>
             {data.map((d) => <Cell key={d.key} fill={ZONE_COLORS[d.z]} />)}
@@ -136,13 +151,19 @@ const PSI_HEIGHT = 190;
 const CORE_HEIGHT = 150;
 const PSI_DOMAIN = [0, 10];
 
-const strainSeries = [
-  { key: 'psi', label: 'PSI 1-min average', color: SERIES.ink, kind: 'line', fmt: (v) => fmtFixed(v, 1) },
-  { key: 'psiMax', label: 'PSI 1-min max', color: SERIES.inkSecondary, kind: 'thin', fmt: (v) => fmtFixed(v, 1) },
-  { key: 'core', label: 'core temperature (est.)', color: SERIES.ink, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${v.toFixed(2)} °C`) },
-];
+const strainSeries = themed(() => {
+  const { SERIES } = chartColors();
+  return [
+    { key: 'psi', label: 'PSI 1-min average', color: SERIES.ink, kind: 'line', fmt: (v) => fmtFixed(v, 1) },
+    { key: 'psiMax', label: 'PSI 1-min max', color: SERIES.inkSecondary, kind: 'thin', fmt: (v) => fmtFixed(v, 1) },
+    { key: 'core', label: 'core temperature (est.)', color: SERIES.ink, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${v.toFixed(2)} °C`) },
+  ];
+});
 
 export const StrainChart = memo(function StrainChart({ rows, domain, ticks, withDate, span }) {
+  useTheme();
+  const { SERIES, PSI_BAND_FILLS } = chartColors();
+  const dot = dots();
   const hasPsi = useMemo(() => seriesHas(rows, 'psi') || seriesHas(rows, 'psiMax'), [rows]);
   const hasCore = useMemo(() => seriesHas(rows, 'core'), [rows]);
   const coreAxis = useMemo(() => {
@@ -159,7 +180,7 @@ export const StrainChart = memo(function StrainChart({ rows, domain, ticks, with
     rows: rows.filter((r) => !r.gap && (r.psi !== null || r.psiMax !== null || r.core !== null)),
   }), [rows]);
   const plotPx = PSI_HEIGHT - X_AXIS_HEIGHT - MARGIN.top;
-  const tooltip = <TimeTooltip series={strainSeries} withDate={withDate} />;
+  const tooltip = <TimeTooltip series={strainSeries()} withDate={withDate} />;
   return (
     <ChartCard title="Physiological strain" subtitle={span} table={table}
       legend={hasPsi ? [
@@ -167,7 +188,7 @@ export const StrainChart = memo(function StrainChart({ rows, domain, ticks, with
         { label: 'PSI 1-min max', color: SERIES.inkSecondary, kind: 'thin' },
       ] : null}
       empty={hasPsi || hasCore ? null : 'No PSI or core temperature in this window.'}>
-      <div style={panelLabel}>PSI (est.)</div>
+      <div style={panelLabel()}>PSI (est.)</div>
       {hasPsi ? (
         <ResponsiveContainer width="100%" height={PSI_HEIGHT}>
           <ComposedChart data={rows} margin={MARGIN} syncId="halo-analytics-strain">
@@ -179,26 +200,26 @@ export const StrainChart = memo(function StrainChart({ rows, domain, ticks, with
                   stroke="none" ifOverflow="hidden" label={bandLabel(b.label, bandPx(y1, y2, PSI_DOMAIN, plotPx))} />
               );
             })}
-            <CartesianGrid {...GRID_PROPS} />
+            <CartesianGrid {...gridProps()} />
             <XAxis {...timeAxisProps(domain, ticks)} />
             <YAxis {...yAxisProps({ domain: PSI_DOMAIN, ticks: [0, 3, 5, 7, 9] })} />
-            <Tooltip content={tooltip} cursor={LINE_CURSOR} isAnimationActive={false} />
-            <Line type="linear" dataKey="psiMax" stroke={SERIES.inkSecondary} strokeWidth={1.5} dot={DOT_INK2} activeDot={activeDot(SERIES.inkSecondary)} isAnimationActive={false} />
-            <Line type="linear" dataKey="psi" stroke={SERIES.ink} strokeWidth={2} dot={DOT_INK} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
+            <Tooltip content={tooltip} cursor={lineCursor()} isAnimationActive={false} />
+            <Line type="linear" dataKey="psiMax" stroke={SERIES.inkSecondary} strokeWidth={1.5} dot={dot.ink2} activeDot={activeDot(SERIES.inkSecondary)} isAnimationActive={false} />
+            <Line type="linear" dataKey="psi" stroke={SERIES.ink} strokeWidth={2} dot={dot.ink} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       ) : <EmptyNote>No PSI in this window.</EmptyNote>}
-      <div style={panelLabel}>Core temperature (est.), °C</div>
+      <div style={panelLabel()}>Core temperature (est.), °C</div>
       {hasCore ? (
         <ResponsiveContainer width="100%" height={CORE_HEIGHT}>
           <ComposedChart data={rows} margin={MARGIN} syncId="halo-analytics-strain">
-            <CartesianGrid {...GRID_PROPS} />
+            <CartesianGrid {...gridProps()} />
             <XAxis {...timeAxisProps(domain, ticks)} />
             <YAxis {...yAxisProps({ domain: coreAxis.domain, ticks: coreAxis.ticks, tickFormatter: (v) => v.toFixed(1) })} />
-            <Tooltip content={tooltip} cursor={LINE_CURSOR} isAnimationActive={false} />
+            <Tooltip content={tooltip} cursor={lineCursor()} isAnimationActive={false} />
             <ReferenceLine y={CORE_WARN_C} stroke={SERIES.warnLine} strokeDasharray="4 3" ifOverflow="extendDomain" label={refLineLabel(`${CORE_WARN_C} °C (P1)`)} />
             <ReferenceLine y={CORE_CRIT_C} stroke={SERIES.critLine} strokeDasharray="4 3" ifOverflow="extendDomain" label={refLineLabel(`${CORE_CRIT_C} °C (P0)`)} />
-            <Line type="linear" dataKey="core" stroke={SERIES.ink} strokeWidth={2} dot={DOT_INK} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
+            <Line type="linear" dataKey="core" stroke={SERIES.ink} strokeWidth={2} dot={dot.ink} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       ) : <EmptyNote>No core temperature in this window.</EmptyNote>}
@@ -208,12 +229,18 @@ export const StrainChart = memo(function StrainChart({ rows, domain, ticks, with
 
 // ─── 7. SPO2 ─────────────────────────────────────────────────────────────────
 
-const spo2Series = [
-  { key: 'spo2', label: '1-min average', color: SERIES.spo2Avg, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)}%`) },
-  { key: 'spo2Min', label: '1-min minimum', color: SERIES.spo2Min, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)}%`) },
-];
+const spo2Series = themed(() => {
+  const { SERIES } = chartColors();
+  return [
+    { key: 'spo2', label: '1-min average', color: SERIES.spo2Avg, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)}%`) },
+    { key: 'spo2Min', label: '1-min minimum', color: SERIES.spo2Min, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)}%`) },
+  ];
+});
 
 export const Spo2Chart = memo(function Spo2Chart({ rows, domain, ticks, withDate, span }) {
+  useTheme();
+  const { SERIES } = chartColors();
+  const dot = dots();
   const has = useMemo(() => seriesHas(rows, 'spo2') || seriesHas(rows, 'spo2Min'), [rows]);
   const yAxis = useMemo(() => {
     const e = seriesExtent(rows, ['spo2', 'spo2Min']);
@@ -236,14 +263,14 @@ export const Spo2Chart = memo(function Spo2Chart({ rows, domain, ticks, withDate
       empty={has ? null : 'No valid SpO2 in this window.'}>
       <ResponsiveContainer width="100%" height={220}>
         <ComposedChart data={rows} margin={MARGIN}>
-          <CartesianGrid {...GRID_PROPS} />
+          <CartesianGrid {...gridProps()} />
           <XAxis {...timeAxisProps(domain, ticks)} />
           <YAxis {...yAxisProps({ domain: yAxis.domain, ticks: yAxis.ticks, allowDecimals: false })} />
-          <Tooltip content={<TimeTooltip series={spo2Series} withDate={withDate} />} cursor={LINE_CURSOR} isAnimationActive={false} />
+          <Tooltip content={<TimeTooltip series={spo2Series()} withDate={withDate} />} cursor={lineCursor()} isAnimationActive={false} />
           <ReferenceLine y={SPO2_LOW} stroke={SERIES.warnLine} strokeDasharray="4 3" ifOverflow="extendDomain" label={refLineLabel(`${SPO2_LOW}% (P1)`, 'insideBottomLeft')} />
           <ReferenceLine y={SPO2_CRITICAL} stroke={SERIES.critLine} strokeDasharray="4 3" ifOverflow="extendDomain" label={refLineLabel(`${SPO2_CRITICAL}% (P0)`, 'insideBottomLeft')} />
-          <Line type="linear" dataKey="spo2" stroke={SERIES.spo2Avg} strokeWidth={2} dot={DOT_SPO2} activeDot={activeDot(SERIES.spo2Avg)} isAnimationActive={false} />
-          <Line type="linear" dataKey="spo2Min" stroke={SERIES.spo2Min} strokeWidth={2} dot={DOT_SPO2_MIN} activeDot={activeDot(SERIES.spo2Min)} isAnimationActive={false} />
+          <Line type="linear" dataKey="spo2" stroke={SERIES.spo2Avg} strokeWidth={2} dot={dot.spo2} activeDot={activeDot(SERIES.spo2Avg)} isAnimationActive={false} />
+          <Line type="linear" dataKey="spo2Min" stroke={SERIES.spo2Min} strokeWidth={2} dot={dot.spo2Min} activeDot={activeDot(SERIES.spo2Min)} isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -253,6 +280,8 @@ export const Spo2Chart = memo(function Spo2Chart({ rows, domain, ticks, withDate
 // ─── 8. HR RECOVERY ──────────────────────────────────────────────────────────
 
 export const HrRecoveryCard = memo(function HrRecoveryCard({ hrr, span }) {
+  useTheme();
+  const { SERIES } = chartColors();
   const scale = Math.max(30, ...hrr.map((h) => h.hrr1));
   const table = {
     columns: [

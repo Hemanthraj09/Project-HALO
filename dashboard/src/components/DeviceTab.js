@@ -72,7 +72,7 @@ export default function DeviceTab({ r, lost }) {
 
       <Card title="GPS" icon={Satellite}>
         <div className="rows">
-          <Row label="Fix" value={g.kind === 'none' ? g.text : g.kind} color={g.kind === 'fresh' ? T.green : g.kind === 'stale' ? T.amber : undefined} />
+          <Row label="Fix" value={g.kind === 'none' ? g.text : g.kind} note={g.sats} color={g.kind === 'fresh' ? T.green : g.kind === 'stale' ? T.amber : undefined} />
           <Row label="Fix age" value={g.fixMs !== null ? <Age since={g.fixMs} suffix=" ago" /> : '--'} />
           <Row label="Satellites" value={isNum(r.gps_sats) ? String(r.gps_sats) : '--'} />
           <Row label="HDOP" value={isNum(r.gps_hdop) ? r.gps_hdop.toFixed(1) : '--'} />

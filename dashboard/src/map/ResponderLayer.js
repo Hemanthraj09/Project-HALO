@@ -3,7 +3,8 @@
 
 import React, { useMemo } from 'react';
 import { Circle, CircleMarker, Popup, Tooltip } from 'react-leaflet';
-import { T } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { MARKER, T, themed } from '../theme';
 import { coValue, ppgValue } from '../lib/format';
 import { gpsState, validLatLon } from '../lib/geo';
 import { isNum } from '../lib/num';
@@ -16,14 +17,14 @@ import { POPUP_PANE, TOOLTIP_PANE } from './mapData';
 import ResponderInfo from './ResponderInfo';
 
 const HIDDEN = { stroke: false, fill: false, opacity: 0, fillOpacity: 0 };
-const RING = { color: T.redFill, weight: 2, fill: false, opacity: 0.9 };
+const ring = themed(() => ({ color: T.redFill, weight: 2, fill: false, opacity: 0.9 }));
 
 function markerStyle(st, fresh, selected) {
   if (st.lost) {
     return { color: st.last.fill, weight: 2, dashArray: '4 3', fillColor: T.grayFill, fillOpacity: 0.5, opacity: 0.95 };
   }
   return {
-    color: selected ? T.blueFill : T.bg1,
+    color: selected ? T.blueFill : MARKER.ring,
     weight: selected ? 3 : 2,
     dashArray: fresh ? null : '3 3',
     fillColor: st.fill,
@@ -76,6 +77,7 @@ function Label({ id, r, st, fresh, packetMs }) {
 }
 
 const ResponderMarker = React.memo(function ResponderMarker({ id, r, lost, selected, cp, showLabel, onSelect }) {
+  useTheme();
   const st = responderStatus(r, lost);
   const fresh = r.gps_ok === true && !lost;
   const { lat, lon } = r;
@@ -85,7 +87,7 @@ const ResponderMarker = React.memo(function ResponderMarker({ id, r, lost, selec
   const packetMs = recordMs(r);
   return (
     <>
-      {!lost && st.priority === 0 ? <CircleMarker center={center} radius={13} interactive={false} className="map-pulse-ring" {...RING} pathOptions={RING} /> : null}
+      {!lost && st.priority === 0 ? <CircleMarker center={center} radius={13} interactive={false} className="map-pulse-ring" {...ring()} pathOptions={ring()} /> : null}
       <CircleMarker center={center} radius={selected ? 10 : 8} {...style} pathOptions={style} eventHandlers={handlers}>
         <Tooltip pane={TOOLTIP_PANE} direction="top" offset={[0, -10]} opacity={1}>
           <ResponderInfo id={id} r={r} st={st} />

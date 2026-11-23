@@ -6,12 +6,14 @@ import React, { useMemo, useState } from 'react';
 import { BellRing } from 'lucide-react';
 import { ALERT_FILTERS, filterAlerts } from '../lib/alerts';
 import { collectActiveAlerts } from '../lib/status';
+import { useTheme } from '../lib/themeMode';
 import AlertRow from './AlertRow';
 import { AccessNotice } from './NotAuthorised';
 import PriorityLegend from './PriorityLegend';
 import { Empty, Panel } from './ui';
 
 function AlertFeed({ alerts, legacyKeys, responders, lostIds, error, user, onPick }) {
+  useTheme();
   const [filter, setFilter] = useState('all');
   const shown = useMemo(() => filterAlerts(alerts, filter), [alerts, filter]);
   const active = useMemo(() => collectActiveAlerts(responders, lostIds), [responders, lostIds]);

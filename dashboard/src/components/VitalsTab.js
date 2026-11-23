@@ -1,39 +1,43 @@
 // VITALS tab: HR, SpO2, estimated core temperature and PSI, with time-axis charts.
 
 import React from 'react';
-import { T } from '../theme';
+import { T, themed } from '../theme';
 import { coreValue, ppgValue, psiValue } from '../lib/format';
 import { coreBand, hrBand, psiBand, spo2Band, TH } from '../lib/thresholds';
 import TimeChart, { ChartCard } from './TimeChart';
 import { Flag, Stat } from './ui';
 
-// Constant props keep the memoised charts from re-rendering on every packet.
+// Constant props keep the memoised charts from re-rendering on every packet (built per theme).
+// Limits 20 bpm / 4 % / 1 °C apart sit about 12 px apart: the upper one's label goes above its
+// line, so the two labels never overlap; P1 < 40 too, to stay clear of the time axis.
 const HR_DOMAIN = [30, 200];
 const SPO2_DOMAIN = [80, 100];
 const CORE_DOMAIN = [36, 40.5];
 const PSI_DOMAIN = [0, 10];
-const HR_SERIES = [{ key: 'hr', name: 'HR', color: T.redFill, unit: 'bpm', digits: 0 }];
-const HR_LINES = [
-  { y: TH.HR_P0, label: `P0 > ${TH.HR_P0}`, color: T.red },
-  { y: TH.HR_P1_HIGH, label: `P1 > ${TH.HR_P1_HIGH}`, color: T.amber },
-  { y: TH.HR_P1_LOW, label: `P1 < ${TH.HR_P1_LOW}`, color: T.amber },
-];
-const SPO2_SERIES = [{ key: 'spo2', name: 'SpO₂', color: T.blueFill, unit: '%', digits: 0 }];
-const SPO2_LINES = [
-  { y: TH.SPO2_P1, label: `P1 < ${TH.SPO2_P1}`, color: T.amber },
-  { y: TH.SPO2_P0, label: `P0 < ${TH.SPO2_P0}`, color: T.red },
-];
-const CORE_SERIES = [{ key: 'core', name: 'Core (est.)', color: T.orangeFill, unit: '°C', digits: 2 }];
-const CORE_LINES = [
-  { y: TH.CORE_P1, label: `P1 > ${TH.CORE_P1}`, color: T.amber },
-  { y: TH.CORE_P0, label: `P0 > ${TH.CORE_P0}`, color: T.red },
-];
-const PSI_SERIES = [{ key: 'psi', name: 'PSI', color: T.purpleFill, unit: '/10', digits: 1 }];
-const PSI_BANDS = [
-  { y1: 5, y2: 7, fill: T.amberFill, opacity: 0.08 },
-  { y1: 7, y2: 9, fill: T.orangeFill, opacity: 0.1 },
-  { y1: 9, y2: 10, fill: T.redFill, opacity: 0.1 },
-];
+const charts = themed(() => ({
+  hrSeries: [{ key: 'hr', name: 'HR', color: T.redFill, unit: 'bpm', digits: 0 }],
+  hrLines: [
+    { y: TH.HR_P0, label: `P0 > ${TH.HR_P0}`, color: T.red, above: true },
+    { y: TH.HR_P1_HIGH, label: `P1 > ${TH.HR_P1_HIGH}`, color: T.amber },
+    { y: TH.HR_P1_LOW, label: `P1 < ${TH.HR_P1_LOW}`, color: T.amber, above: true },
+  ],
+  spo2Series: [{ key: 'spo2', name: 'SpO₂', color: T.blueFill, unit: '%', digits: 0 }],
+  spo2Lines: [
+    { y: TH.SPO2_P1, label: `P1 < ${TH.SPO2_P1}`, color: T.amber, above: true },
+    { y: TH.SPO2_P0, label: `P0 < ${TH.SPO2_P0}`, color: T.red },
+  ],
+  coreSeries: [{ key: 'core', name: 'Core (est.)', color: T.orangeFill, unit: '°C', digits: 2 }],
+  coreLines: [
+    { y: TH.CORE_P1, label: `P1 > ${TH.CORE_P1}`, color: T.amber },
+    { y: TH.CORE_P0, label: `P0 > ${TH.CORE_P0}`, color: T.red, above: true },
+  ],
+  psiSeries: [{ key: 'psi', name: 'PSI', color: T.purpleFill, unit: '/10', digits: 1 }],
+  psiBands: [
+    { y1: 5, y2: 7, fill: T.amberFill, opacity: 0.08 },
+    { y1: 7, y2: 9, fill: T.orangeFill, opacity: 0.1 },
+    { y1: 9, y2: 10, fill: T.redFill, opacity: 0.1 },
+  ],
+}));
 
 function skinText(skin) {
   if (skin === true) return 'On skin';
@@ -57,6 +61,7 @@ export default function VitalsTab({ r, series }) {
   const spo2 = ppgValue(r, 'spo2');
   const core = coreValue(r);
   const psi = psiValue(r);
+  const c = charts();
   return (
     <>
       <div className="stat-grid">
@@ -67,16 +72,16 @@ export default function VitalsTab({ r, series }) {
       </div>
       <PpgFlags r={r} />
       <ChartCard title="Heart rate" span={series.span}>
-        <TimeChart data={series.points} series={HR_SERIES} yDomain={HR_DOMAIN} refLines={HR_LINES} />
+        <TimeChart data={series.points} series={c.hrSeries} yDomain={HR_DOMAIN} refLines={c.hrLines} />
       </ChartCard>
       <ChartCard title="SpO₂" span={series.span}>
-        <TimeChart data={series.points} series={SPO2_SERIES} yDomain={SPO2_DOMAIN} refLines={SPO2_LINES} height={100} />
+        <TimeChart data={series.points} series={c.spo2Series} yDomain={SPO2_DOMAIN} refLines={c.spo2Lines} height={100} />
       </ChartCard>
       <ChartCard title="Core temperature (est.)" span={series.span}>
-        <TimeChart data={series.points} series={CORE_SERIES} yDomain={CORE_DOMAIN} refLines={CORE_LINES} height={100} />
+        <TimeChart data={series.points} series={c.coreSeries} yDomain={CORE_DOMAIN} refLines={c.coreLines} height={100} />
       </ChartCard>
       <ChartCard title="Physiological strain (PSI)" span={series.span}>
-        <TimeChart data={series.points} series={PSI_SERIES} yDomain={PSI_DOMAIN} bands={PSI_BANDS} height={100} />
+        <TimeChart data={series.points} series={c.psiSeries} yDomain={PSI_DOMAIN} bands={c.psiBands} height={100} />
       </ChartCard>
     </>
   );

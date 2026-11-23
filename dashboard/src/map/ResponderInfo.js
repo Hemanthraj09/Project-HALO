@@ -10,6 +10,7 @@ import { aqBand, coBand, heatBand, hrBand, spo2Band } from '../lib/thresholds';
 import { recordMs } from '../lib/time';
 import StatusBadge from '../components/StatusBadge';
 import { Age } from '../components/TimeText';
+import { SatsNote } from '../components/ui';
 
 function Val({ v, unit, band }) {
   if (v.state === 'warming') return <span style={{ color: T.amber, fontWeight: 600 }}>{v.note}</span>;
@@ -66,6 +67,7 @@ export default function ResponderInfo({ id, r, st, cp }) {
           {g.kind === 'stale' && g.fixMs !== null ? <Age since={g.fixMs} prefix="last fix " suffix=" ago" /> : null}
           {g.kind === 'stale' && g.fixMs === null ? 'stale fix' : null}
           {g.kind === 'none' ? g.text : null}
+          <SatsNote sats={g.sats} />
         </dd>
         {toCp ? (
           <>

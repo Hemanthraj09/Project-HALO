@@ -1,32 +1,39 @@
-// Exposure and workload charts: heat index, CO, activity intensity.
+// Exposure and workload charts: heat index, CO, activity intensity. Memoised; each also re-renders
+// on a theme switch (useTheme).
 
 import { memo, useMemo } from 'react';
 import {
   Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ReferenceArea, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { T, FS, RADIUS } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { T, FS, RADIUS, themed } from '../theme';
 import {
   ACTIVITY_BANDS, CO_CEILING_PPM, CO_REL_PPM, HEAT_BANDS,
   activityBuckets, fmtFixed, fmtHM, fmtInt, fmtMinutes, fmtPpm, niceTicks, seriesExtent, seriesHas,
 } from './metrics';
-import { ACTIVITY_COLORS, HEAT_BAND_FILLS, HEAT_BAND_OPACITY, HEAT_BAR_COLORS, SERIES } from './palette';
+import { chartColors, HEAT_BAND_OPACITY } from './palette';
 import { BarTooltip, ChartCard, EmptyNote, NUM, TimeTooltip } from './ui';
 import {
-  AXIS_TICK, BAR_CURSOR, GRID_PROPS, LINE_CURSOR, MARGIN, X_AXIS_HEIGHT,
-  activeDot, bandLabel, bandPx, compactTick, isolatedDot, refLineLabel, timeAxisProps, yAxisProps,
+  MARGIN, X_AXIS_HEIGHT,
+  activeDot, axisTick, bandLabel, bandPx, barCursor, compactTick, gridProps, isolatedDot, lineCursor, refLineLabel, timeAxisProps, yAxisProps,
 } from './chartKit';
 
-const DOT_INK = isolatedDot(SERIES.ink);
-const DOT_INK2 = isolatedDot(SERIES.inkSecondary);
-const DOT_CO = isolatedDot(SERIES.coAvg);
-const DOT_CO_MAX = isolatedDot(SERIES.coMax);
-const DOT_TWA = isolatedDot(SERIES.twa);
+const dots = themed(() => {
+  const { SERIES } = chartColors();
+  return {
+    ink: isolatedDot(SERIES.ink),
+    ink2: isolatedDot(SERIES.inkSecondary),
+    co: isolatedDot(SERIES.coAvg),
+    coMax: isolatedDot(SERIES.coMax),
+    twa: isolatedDot(SERIES.twa),
+  };
+});
 
 const missing = (v) => v === null || v === undefined;
 const degC = (v) => (missing(v) ? '--' : `${v.toFixed(1)} °C`);
 const ppm = (v) => (missing(v) ? '--' : `${fmtPpm(v)} ppm`);
-const panelLabel = { fontSize: FS.sm, fontWeight: 500, color: T.textMuted, marginTop: 4 };
+const panelLabel = themed(() => ({ fontSize: FS.sm, fontWeight: 500, color: T.textMuted, marginTop: 4 }));
 
 // A name, a bar and a figure per row (time-in-band lists).
 function BarList({ rows, scaleMax, valueText }) {
@@ -52,14 +59,20 @@ function BarList({ rows, scaleMax, valueText }) {
 
 const HEAT_HEIGHT = 210;
 
-const heatSeries = [
-  { key: 'heat', label: 'heat index, 1-min average', color: SERIES.ink, kind: 'line', fmt: degC },
-  { key: 'heatMax', label: 'heat index, 1-min max', color: SERIES.inkSecondary, kind: 'thin', fmt: degC },
-  { key: 'temp', label: 'ambient air', color: T.borderMid, kind: 'bar', fmt: degC },
-  { key: 'hum', label: 'humidity', color: T.borderMid, kind: 'bar', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)}%`) },
-];
+const heatSeries = themed(() => {
+  const { SERIES } = chartColors();
+  return [
+    { key: 'heat', label: 'heat index, 1-min average', color: SERIES.ink, kind: 'line', fmt: degC },
+    { key: 'heatMax', label: 'heat index, 1-min max', color: SERIES.inkSecondary, kind: 'thin', fmt: degC },
+    { key: 'temp', label: 'ambient air', color: T.borderMid, kind: 'bar', fmt: degC },
+    { key: 'hum', label: 'humidity', color: T.borderMid, kind: 'bar', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)}%`) },
+  ];
+});
 
 export const HeatChart = memo(function HeatChart({ rows, domain, ticks, withDate, span, bandsS }) {
+  useTheme();
+  const { SERIES, HEAT_BAND_FILLS, HEAT_BAR_COLORS } = chartColors();
+  const dot = dots();
   const has = useMemo(() => seriesHas(rows, 'heat') || seriesHas(rows, 'heatMax'), [rows]);
   const yAxis = useMemo(() => {
     const e = seriesExtent(rows, ['heat', 'heatMax']);
@@ -97,15 +110,15 @@ export const HeatChart = memo(function HeatChart({ rows, domain, ticks, withDate
                 ifOverflow="hidden" label={bandLabel(b.label.toLowerCase(), bandPx(y1, y2, yDomain, plotPx))} />
             );
           })}
-          <CartesianGrid {...GRID_PROPS} />
+          <CartesianGrid {...gridProps()} />
           <XAxis {...timeAxisProps(domain, ticks)} />
           <YAxis {...yAxisProps({ domain: yDomain, ticks: yAxis.ticks, allowDecimals: false })} />
-          <Tooltip content={<TimeTooltip series={heatSeries} withDate={withDate} />} cursor={LINE_CURSOR} isAnimationActive={false} />
-          <Line type="linear" dataKey="heatMax" stroke={SERIES.inkSecondary} strokeWidth={1.5} dot={DOT_INK2} activeDot={activeDot(SERIES.inkSecondary)} isAnimationActive={false} />
-          <Line type="linear" dataKey="heat" stroke={SERIES.ink} strokeWidth={2} dot={DOT_INK} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
+          <Tooltip content={<TimeTooltip series={heatSeries()} withDate={withDate} />} cursor={lineCursor()} isAnimationActive={false} />
+          <Line type="linear" dataKey="heatMax" stroke={SERIES.inkSecondary} strokeWidth={1.5} dot={dot.ink2} activeDot={activeDot(SERIES.inkSecondary)} isAnimationActive={false} />
+          <Line type="linear" dataKey="heat" stroke={SERIES.ink} strokeWidth={2} dot={dot.ink} activeDot={activeDot(SERIES.ink)} isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
-      <div style={panelLabel}>Time in band</div>
+      <div style={panelLabel()}>Time in band</div>
       {bandsS ? <BarList rows={bandRows} scaleMax={bandMax} valueText={(v) => `${fmtMinutes(v)} min`} />
         : <EmptyNote>No heat index readings.</EmptyNote>}
     </ChartCard>
@@ -114,14 +127,20 @@ export const HeatChart = memo(function HeatChart({ rows, domain, ticks, withDate
 
 // ─── 5. CO EXPOSURE ──────────────────────────────────────────────────────────
 
-const coSeries = [
-  { key: 'co', label: 'CO 1-min average', color: SERIES.coAvg, kind: 'line', fmt: ppm },
-  { key: 'coMax', label: 'CO 1-min max', color: SERIES.coMax, kind: 'thin', fmt: ppm },
-  { key: 'twa', label: '15-min TWA', color: SERIES.twa, kind: 'line', fmt: ppm },
-  { key: 'dose', label: 'cumulative dose', color: SERIES.dose, kind: 'bar', fmt: (v) => (missing(v) ? '--' : `${fmtInt(v)} ppm·min`) },
-];
+const coSeries = themed(() => {
+  const { SERIES } = chartColors();
+  return [
+    { key: 'co', label: 'CO 1-min average', color: SERIES.coAvg, kind: 'line', fmt: ppm },
+    { key: 'coMax', label: 'CO 1-min max', color: SERIES.coMax, kind: 'thin', fmt: ppm },
+    { key: 'twa', label: '15-min TWA', color: SERIES.twa, kind: 'line', fmt: ppm },
+    { key: 'dose', label: 'cumulative dose', color: SERIES.dose, kind: 'bar', fmt: (v) => (missing(v) ? '--' : `${fmtInt(v)} ppm·min`) },
+  ];
+});
 
 export const CoChart = memo(function CoChart({ rows, domain, ticks, withDate, span }) {
+  useTheme();
+  const { SERIES } = chartColors();
+  const dot = dots();
   const has = useMemo(() => seriesHas(rows, 'co') || seriesHas(rows, 'coMax') || seriesHas(rows, 'twa'), [rows]);
   const hasDose = useMemo(() => seriesHas(rows, 'dose'), [rows]);
   const coAxis = useMemo(() => {
@@ -142,7 +161,7 @@ export const CoChart = memo(function CoChart({ rows, domain, ticks, withDate, sp
     ],
     rows: rows.filter((r) => !r.gap && (r.co !== null || r.coMax !== null || r.twa !== null)),
   }), [rows]);
-  const tooltip = <TimeTooltip series={coSeries} withDate={withDate} />;
+  const tooltip = <TimeTooltip series={coSeries()} withDate={withDate} />;
   return (
     <ChartCard title="CO exposure" subtitle={span} table={table}
       legend={[
@@ -151,28 +170,28 @@ export const CoChart = memo(function CoChart({ rows, domain, ticks, withDate, sp
         { label: '15-min TWA', color: SERIES.twa, kind: 'line' },
       ]}
       empty={has ? null : 'No CO data in this window.'}>
-      <div style={panelLabel}>CO, ppm</div>
+      <div style={panelLabel()}>CO, ppm</div>
       <ResponsiveContainer width="100%" height={210}>
         <ComposedChart data={rows} margin={MARGIN} syncId="halo-analytics-co">
-          <CartesianGrid {...GRID_PROPS} />
+          <CartesianGrid {...gridProps()} />
           <XAxis {...timeAxisProps(domain, ticks)} />
           <YAxis {...yAxisProps({ domain: coAxis.domain, ticks: coAxis.ticks, allowDecimals: false, tickFormatter: compactTick })} />
-          <Tooltip content={tooltip} cursor={LINE_CURSOR} isAnimationActive={false} />
+          <Tooltip content={tooltip} cursor={lineCursor()} isAnimationActive={false} />
           <ReferenceLine y={CO_REL_PPM} stroke={SERIES.warnLine} strokeDasharray="4 3" ifOverflow="extendDomain" label={refLineLabel(`${CO_REL_PPM} ppm (P1)`)} />
           <ReferenceLine y={CO_CEILING_PPM} stroke={SERIES.critLine} strokeDasharray="4 3" ifOverflow="extendDomain" label={refLineLabel(`${CO_CEILING_PPM} ppm (P0)`)} />
-          <Line type="linear" dataKey="coMax" stroke={SERIES.coMax} strokeWidth={1.5} dot={DOT_CO_MAX} activeDot={activeDot(SERIES.coMax)} isAnimationActive={false} />
-          <Line type="linear" dataKey="co" stroke={SERIES.coAvg} strokeWidth={2} dot={DOT_CO} activeDot={activeDot(SERIES.coAvg)} isAnimationActive={false} />
-          <Line type="linear" dataKey="twa" stroke={SERIES.twa} strokeWidth={2} dot={DOT_TWA} activeDot={activeDot(SERIES.twa)} isAnimationActive={false} />
+          <Line type="linear" dataKey="coMax" stroke={SERIES.coMax} strokeWidth={1.5} dot={dot.coMax} activeDot={activeDot(SERIES.coMax)} isAnimationActive={false} />
+          <Line type="linear" dataKey="co" stroke={SERIES.coAvg} strokeWidth={2} dot={dot.co} activeDot={activeDot(SERIES.coAvg)} isAnimationActive={false} />
+          <Line type="linear" dataKey="twa" stroke={SERIES.twa} strokeWidth={2} dot={dot.twa} activeDot={activeDot(SERIES.twa)} isAnimationActive={false} />
         </ComposedChart>
       </ResponsiveContainer>
-      <div style={panelLabel}>Cumulative CO dose, ppm·min</div>
+      <div style={panelLabel()}>Cumulative CO dose, ppm·min</div>
       {hasDose ? (
         <ResponsiveContainer width="100%" height={130}>
           <ComposedChart data={rows} margin={MARGIN} syncId="halo-analytics-co">
-            <CartesianGrid {...GRID_PROPS} />
+            <CartesianGrid {...gridProps()} />
             <XAxis {...timeAxisProps(domain, ticks)} />
             <YAxis {...yAxisProps({ domain: doseAxis.domain, ticks: doseAxis.ticks, tickFormatter: compactTick })} />
-            <Tooltip content={tooltip} cursor={LINE_CURSOR} isAnimationActive={false} />
+            <Tooltip content={tooltip} cursor={lineCursor()} isAnimationActive={false} />
             <Area type="linear" dataKey="dose" stroke={SERIES.dose} strokeWidth={2} fill={SERIES.dose} fillOpacity={0.1} isAnimationActive={false} activeDot={activeDot(SERIES.dose)} />
           </ComposedChart>
         </ResponsiveContainer>
@@ -184,10 +203,12 @@ export const CoChart = memo(function CoChart({ rows, domain, ticks, withDate, sp
 // ─── 6. ACTIVITY INTENSITY ───────────────────────────────────────────────────
 
 const activityRowsOf = (r) => ACTIVITY_BANDS.slice().reverse().map((b) => ({
-  key: b.key, label: b.label.toLowerCase(), color: ACTIVITY_COLORS[b.key], value: `${r[b.key]} min`,
+  key: b.key, label: b.label.toLowerCase(), color: chartColors().ACTIVITY_COLORS[b.key], value: `${r[b.key]} min`,
 }));
 
 export const ActivityChart = memo(function ActivityChart({ minutes, span, bandsS }) {
+  useTheme();
+  const { ACTIVITY_COLORS } = chartColors();
   const buckets = useMemo(() => activityBuckets(minutes), [minutes]);
   const share = useMemo(() => {
     const total = bandsS ? bandsS.reduce((s, x) => s + (x || 0), 0) : 0;
@@ -198,7 +219,7 @@ export const ActivityChart = memo(function ActivityChart({ minutes, span, bandsS
       minutes: bandsS ? (bandsS[i] || 0) / 60 : 0,
       pct: total > 0 ? ((bandsS[i] || 0) / total) * 100 : 0,
     }));
-  }, [bandsS]);
+  }, [bandsS, ACTIVITY_COLORS]);
   const pieData = share.filter((s) => s.minutes > 0);
   const table = {
     columns: [
@@ -214,13 +235,13 @@ export const ActivityChart = memo(function ActivityChart({ minutes, span, bandsS
       empty={has ? null : 'No activity data in this window.'}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
         <div style={{ flex: '1 1 300px', minWidth: 0 }}>
-          <div style={panelLabel}>Minutes per band, 10-minute buckets</div>
+          <div style={panelLabel()}>Minutes per band, 10-minute buckets</div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={buckets} margin={MARGIN} barCategoryGap="15%">
-              <CartesianGrid {...GRID_PROPS} />
-              <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: T.borderMid }} interval="preserveStartEnd" minTickGap={16} height={X_AXIS_HEIGHT} />
+              <CartesianGrid {...gridProps()} />
+              <XAxis dataKey="label" tick={axisTick()} tickLine={false} axisLine={{ stroke: T.borderMid }} interval="preserveStartEnd" minTickGap={16} height={X_AXIS_HEIGHT} />
               <YAxis {...yAxisProps({ allowDecimals: false, domain: [0, 10], ticks: [0, 5, 10] })} />
-              <Tooltip cursor={BAR_CURSOR} isAnimationActive={false}
+              <Tooltip cursor={barCursor()} isAnimationActive={false}
                 content={<BarTooltip title={(r) => `${r.label}–${fmtHM(r.t + 10 * 60 * 1000)}`} rowsOf={activityRowsOf} />} />
               {ACTIVITY_BANDS.map((b) => (
                 <Bar key={b.key} dataKey={b.key} stackId="act" fill={ACTIVITY_COLORS[b.key]} maxBarSize={24} stroke={T.bg2} strokeWidth={2} isAnimationActive={false}>

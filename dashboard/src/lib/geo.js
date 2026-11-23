@@ -62,16 +62,27 @@ export function fixTimeMs(r, packetMs) {
   return r.gps_ok === true ? packetMs : null;
 }
 
+// "5 sats in view" while the chest reports satellites but no fresh fix (link up): the GPS module is
+// connected and receiving, only the signal is too weak for a fix. Null otherwise, including a
+// lost link, whose satellite count is from the last packet.
+function satsInView(r, lost) {
+  if (lost || !r || r.gps_ok === true || gpsUart(r) === false || !isNum(r.gps_sats) || r.gps_sats < 1) return null;
+  const n = Math.round(r.gps_sats);
+  return `${n} sat${n === 1 ? '' : 's'} in view`;
+}
+
 // GPS state for cards, tooltips and the device tab.
 //   kind 'fresh': gps_ok and the link is up; 'stale': a last-known position only; 'none': no position.
 // fixMs is when that fix was taken (null if unknown), so the UI can say "last fix 2 min ago".
+// sats is satsInView() for 'stale' and 'none'.
 export function gpsState(r, lost) {
   const packetMs = recordMs(r);
+  const sats = satsInView(r, lost);
   if (!r || !validLatLon(r.lat, r.lon)) {
-    return { kind: 'none', text: gpsUart(r) === false ? 'No data from the GPS module' : 'No GPS fix yet', fixMs: null, acc: null };
+    return { kind: 'none', text: gpsUart(r) === false ? 'No data from the GPS module' : 'No GPS fix yet', fixMs: null, acc: null, sats };
   }
   const acc = isNum(r.gps_acc_m) && r.gps_acc_m > 0 ? `±${Math.round(r.gps_acc_m)} m` : null;
   const fixMs = fixTimeMs(r, packetMs);
-  if (r.gps_ok === true && !lost) return { kind: 'fresh', text: acc ? `GPS fresh ${acc}` : 'GPS fresh', fixMs, acc };
-  return { kind: 'stale', text: 'Last fix', fixMs, acc };
+  if (r.gps_ok === true && !lost) return { kind: 'fresh', text: acc ? `GPS fresh ${acc}` : 'GPS fresh', fixMs, acc, sats: null };
+  return { kind: 'stale', text: 'Last fix', fixMs, acc, sats };
 }

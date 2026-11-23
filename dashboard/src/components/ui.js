@@ -115,6 +115,18 @@ export function Stat({ label, v, unit, band, big, extra }) {
   );
 }
 
+// " · 5 sats in view" after a stale or missing GPS fix (gpsState().sats). A line that wraps breaks
+// before the count, never inside it.
+export function SatsNote({ sats }) {
+  if (!sats) return null;
+  return (
+    <>
+      {'\u00A0· '}
+      <span className="nowrap">{sats}</span>
+    </>
+  );
+}
+
 export function Banner({ tone, icon: Icon, live, children }) {
   return (
     <div className={`banner banner-${tone}${live ? ' is-live' : ''}`} role={tone === 'p0' ? 'alert' : undefined}>

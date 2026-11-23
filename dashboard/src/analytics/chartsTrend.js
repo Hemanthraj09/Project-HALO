@@ -1,23 +1,24 @@
-// Session comparison and LoRa link.
+// Session comparison and LoRa link. Memoised; each also re-renders on a theme switch (useTheme).
 
 import { memo, useMemo } from 'react';
 import {
   Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Line,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { T, FONT, FS } from '../theme';
+import { useTheme } from '../lib/themeMode';
+import { T, FONT, FS, themed } from '../theme';
 import {
   fmtFixed, fmtHM, fmtInt, fmtPpm, niceTicks, seriesExtent, seriesHas,
 } from './metrics';
-import { SERIES } from './palette';
+import { chartColors } from './palette';
 import { BarTooltip, ChartCard, EmptyNote, TimeTooltip } from './ui';
 import {
-  BAR_CURSOR, GRID_PROPS, LINE_CURSOR, MARGIN,
-  activeDot, compactTick, isolatedDot, timeAxisProps, yAxisProps,
+  MARGIN,
+  activeDot, barCursor, compactTick, gridProps, isolatedDot, lineCursor, timeAxisProps, yAxisProps,
 } from './chartKit';
 
 const missing = (v) => v === null || v === undefined;
-const panelLabel = { fontSize: FS.sm, fontWeight: 500, color: T.textMuted, marginTop: 4 };
+const panelLabel = themed(() => ({ fontSize: FS.sm, fontWeight: 500, color: T.textMuted, marginTop: 4 }));
 
 // ─── 9. SESSION COMPARISON ───────────────────────────────────────────────────
 // Four metrics with different units, so one small bar chart per metric (each with its own axis)
@@ -52,6 +53,7 @@ function SelectedLabel({ x, y, width, value, index, data, fmt }) {
 }
 
 function MiniBars({ data, metric, anySelected }) {
+  const { SERIES } = chartColors();
   const has = data.some((d) => !missing(d[metric.key]));
   const top = Math.max(0, ...data.map((d) => (missing(d[metric.key]) ? 0 : d[metric.key])));
   const axis = niceTicks(0, top > 0 ? top : 1, 4);
@@ -61,10 +63,10 @@ function MiniBars({ data, metric, anySelected }) {
       {has ? (
         <ResponsiveContainer width="100%" height={170}>
           <BarChart data={data} margin={{ ...MARGIN, top: 18, right: 4 }}>
-            <CartesianGrid {...GRID_PROPS} />
+            <CartesianGrid {...gridProps()} />
             <XAxis dataKey="key" interval="preserveStartEnd" minTickGap={6} height={40} tickLine={false} axisLine={{ stroke: T.borderMid }} tick={<SessionTick data={data} />} />
             <YAxis {...yAxisProps({ width: 40, domain: axis.domain, ticks: axis.ticks, tickFormatter: metric.key === 'psiMax' ? (v) => String(v) : compactTick })} />
-            <Tooltip cursor={BAR_CURSOR} isAnimationActive={false}
+            <Tooltip cursor={barCursor()} isAnimationActive={false}
               content={<BarTooltip title={(r) => r.title}
                 rowsOf={(r) => [{ key: metric.key, label: metric.tip, color: r.selected || !anySelected ? SERIES.emphasis : SERIES.deemphasis, value: metric.fmt(r[metric.key]) }]} />} />
             <Bar dataKey={metric.key} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false}>
@@ -79,6 +81,7 @@ function MiniBars({ data, metric, anySelected }) {
 }
 
 export const SessionCompareChart = memo(function SessionCompareChart({ data, style }) {
+  useTheme();
   const anySelected = data.some((d) => d.selected);
   const table = {
     columns: [
@@ -104,15 +107,20 @@ export const SessionCompareChart = memo(function SessionCompareChart({ data, sty
 
 // ─── 10. DEVICE HEALTH ───────────────────────────────────────────────────────
 
-const DOT_LINK = isolatedDot(SERIES.link);
+const linkDot = themed(() => isolatedDot(chartColors().SERIES.link));
 
-const deviceSeries = [
-  { key: 'rssi', label: 'LoRa RSSI', color: SERIES.link, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)} dBm`) },
-  { key: 'snr', label: 'LoRa SNR', color: T.borderMid, kind: 'bar', fmt: (v) => (missing(v) ? '--' : `${v.toFixed(1)} dB`) },
-  { key: 'loss', label: 'LoRa packet loss', color: SERIES.link, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${fmtPpm(v)}%`) },
-];
+const deviceSeries = themed(() => {
+  const { SERIES } = chartColors();
+  return [
+    { key: 'rssi', label: 'LoRa RSSI', color: SERIES.link, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${Math.round(v)} dBm`) },
+    { key: 'snr', label: 'LoRa SNR', color: T.borderMid, kind: 'bar', fmt: (v) => (missing(v) ? '--' : `${v.toFixed(1)} dB`) },
+    { key: 'loss', label: 'LoRa packet loss', color: SERIES.link, kind: 'line', fmt: (v) => (missing(v) ? '--' : `${fmtPpm(v)}%`) },
+  ];
+});
 
 export const DeviceHealthChart = memo(function DeviceHealthChart({ rows, domain, ticks, withDate, span }) {
+  useTheme();
+  const { SERIES } = chartColors();
   const hasRssi = useMemo(() => seriesHas(rows, 'rssi'), [rows]);
   const hasLoss = useMemo(() => seriesHas(rows, 'loss'), [rows]);
   const rssiAxis = useMemo(() => {
@@ -132,32 +140,32 @@ export const DeviceHealthChart = memo(function DeviceHealthChart({ rows, domain,
     ],
     rows: rows.filter((r) => !r.gap && (r.rssi !== null || r.loss !== null)),
   }), [rows]);
-  const tooltip = <TimeTooltip series={deviceSeries} withDate={withDate} />;
+  const tooltip = <TimeTooltip series={deviceSeries()} withDate={withDate} />;
   const anything = hasRssi || hasLoss;
   return (
     <ChartCard title="LoRa link" subtitle={span} table={table}
       empty={anything ? null : 'No LoRa link data in this window.'}>
-      <div style={panelLabel}>LoRa RSSI, dBm</div>
+      <div style={panelLabel()}>LoRa RSSI, dBm</div>
       {hasRssi ? (
         <ResponsiveContainer width="100%" height={120}>
           <ComposedChart data={rows} margin={MARGIN} syncId="halo-analytics-device">
-            <CartesianGrid {...GRID_PROPS} />
+            <CartesianGrid {...gridProps()} />
             <XAxis {...timeAxisProps(domain, ticks)} />
             <YAxis {...yAxisProps({ domain: rssiAxis.domain, ticks: rssiAxis.ticks, allowDecimals: false })} />
-            <Tooltip content={tooltip} cursor={LINE_CURSOR} isAnimationActive={false} />
-            <Line type="linear" dataKey="rssi" stroke={SERIES.link} strokeWidth={2} dot={DOT_LINK} activeDot={activeDot(SERIES.link)} isAnimationActive={false} />
+            <Tooltip content={tooltip} cursor={lineCursor()} isAnimationActive={false} />
+            <Line type="linear" dataKey="rssi" stroke={SERIES.link} strokeWidth={2} dot={linkDot()} activeDot={activeDot(SERIES.link)} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       ) : <EmptyNote>No RSSI in this window.</EmptyNote>}
-      <div style={panelLabel}>LoRa packet loss, %</div>
+      <div style={panelLabel()}>LoRa packet loss, %</div>
       {hasLoss ? (
         <ResponsiveContainer width="100%" height={120}>
           <ComposedChart data={rows} margin={MARGIN} syncId="halo-analytics-device">
-            <CartesianGrid {...GRID_PROPS} />
+            <CartesianGrid {...gridProps()} />
             <XAxis {...timeAxisProps(domain, ticks)} />
             <YAxis {...yAxisProps({ domain: lossAxis.domain, ticks: lossAxis.ticks })} />
-            <Tooltip content={tooltip} cursor={LINE_CURSOR} isAnimationActive={false} />
-            <Line type="linear" dataKey="loss" stroke={SERIES.link} strokeWidth={2} dot={DOT_LINK} activeDot={activeDot(SERIES.link)} isAnimationActive={false} />
+            <Tooltip content={tooltip} cursor={lineCursor()} isAnimationActive={false} />
+            <Line type="linear" dataKey="loss" stroke={SERIES.link} strokeWidth={2} dot={linkDot()} activeDot={activeDot(SERIES.link)} isAnimationActive={false} />
           </ComposedChart>
         </ResponsiveContainer>
       ) : <EmptyNote>No packet loss data in this window.</EmptyNote>}
